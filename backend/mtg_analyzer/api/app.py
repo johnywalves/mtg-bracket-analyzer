@@ -6,8 +6,11 @@ phases in project-plan.md (card lookup, deck import/analysis, recommendations).
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+import os
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from mtg_analyzer import __version__
 
@@ -16,6 +19,9 @@ ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+# Routes that must stay reachable without a key (deploy/orchestration probes).
+UNAUTHENTICATED_PATHS = {"/health"}
 
 app = FastAPI(
     title="MTG Analyzer",
@@ -29,6 +35,33 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def require_api_key(request: Request, call_next):
+    """Reject requests without a valid API_KEY (see docs/spec/bracket-engine.md §47.1).
+
+    Accepts either header:
+      X-API-Key: <key>
+      Authorization: Bearer <key>
+
+    If API_KEY is unset in the environment, auth is skipped (local dev without .env).
+    """
+    expected = os.environ.get("API_KEY")
+    if expected and request.url.path not in UNAUTHENTICATED_PATHS:
+        provided = request.headers.get("X-API-Key")
+        if not provided:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                provided = auth_header.removeprefix("Bearer ")
+
+        if provided != expected:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Missing or invalid API key."},
+            )
+
+    return await call_next(request)
 
 
 @app.get("/health")
