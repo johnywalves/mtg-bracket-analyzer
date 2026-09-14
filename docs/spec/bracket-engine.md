@@ -1,0 +1,2412 @@
+# Bracket Engine Specification
+
+**Status:** Draft  
+**Specification Version:** 0.1.0  
+**Engine Version:** 0.1.0  
+**Target Format:** Commander / EDH  
+**Primary Language:** Python 3.11+  
+**License:** MIT  
+**Project:** MTG Bracket Analyzer
+
+---
+
+## 1. Purpose
+
+The Bracket Engine analyzes a Magic: The Gathering Commander deck and produces an evidence-based estimate of its Commander Bracket.
+
+The engine MUST:
+
+- accept a resolved Commander deck;
+- evaluate the deck against a versioned Commander Brackets ruleset;
+- identify relevant cards, combinations, and deck characteristics;
+- distinguish official rules from project heuristics;
+- produce an explainable assessment;
+- expose uncertainty rather than pretending to provide absolute classification;
+- be deterministic for the same input, data snapshot, and ruleset;
+- remain independent from HTTP, FastAPI, Next.js, Docker, CLI, and presentation concerns.
+
+The engine is an analytical tool.
+
+It MUST NOT claim to be an official Wizards of the Coast rules engine or official Commander Bracket calculator.
+
+---
+
+# 2. Scope
+
+## 2.1 In scope
+
+The first version of the engine covers:
+
+1. Commander deck validation;
+2. deck normalization;
+3. card identity resolution;
+4. Commander identification;
+5. ruleset version selection;
+6. Game Changer detection;
+7. extra-turn detection;
+8. mass-land-denial detection;
+9. known-combo detection;
+10. fast-mana analysis;
+11. tutor analysis;
+12. interaction analysis;
+13. consistency-related signals;
+14. bracket classification;
+15. confidence calculation;
+16. evidence generation;
+17. warnings;
+18. machine-readable assessment output;
+19. human-readable report generation.
+
+---
+
+## 2.2 Out of scope
+
+The engine MUST NOT initially attempt to implement:
+
+- the complete Magic rules engine;
+- gameplay simulation;
+- priority resolution;
+- stack resolution;
+- combat simulation;
+- multiplayer politics;
+- player skill;
+- pilot quality;
+- subjective "fun";
+- guaranteed win probability;
+- tournament matchmaking;
+- market pricing;
+- card purchasing;
+- deck recommendations.
+
+Those concerns may be implemented by other services later.
+
+---
+
+# 3. Design Principles
+
+The engine MUST follow these principles.
+
+## 3.1 Explainability
+
+Every material classification MUST be traceable to one or more signals.
+
+The system MUST be able to answer:
+
+> Why was this deck classified as Bracket 3?
+
+A result without supporting evidence is considered incomplete.
+
+---
+
+## 3.2 Official vs heuristic separation
+
+The engine MUST distinguish:
+
+### Official signals
+
+Signals directly derived from the selected Commander Brackets ruleset or official Commander Brackets documentation.
+
+Examples:
+
+- Game Changers;
+- specified extra-turn considerations;
+- specified mass-land-denial considerations;
+- specified combo considerations;
+- bracket definitions.
+
+### Heuristic signals
+
+Signals created by this project to improve analysis but which are NOT themselves official bracket rules.
+
+Examples:
+
+- fast-mana density;
+- tutor density;
+- interaction density;
+- average mana value;
+- mana efficiency;
+- card advantage density;
+- consistency;
+- estimated speed.
+
+The report MUST never present a heuristic as an official Commander Bracket rule.
+
+---
+
+## 3.3 Version everything
+
+Bracket rules change over time.
+
+The engine MUST therefore never assume that the current ruleset is immutable.
+
+Every assessment MUST contain:
+
+```text
+rules_version
+engine_version
+data_version
+```
+
+Example:
+
+```json
+{
+  "rules_version": "2026-02",
+  "engine_version": "0.1.0",
+  "data_version": "scryfall-2026-09-14"
+}
+```
+
+---
+
+## 3.4 Determinism
+
+For identical:
+
+- deck input;
+- normalized card data;
+- ruleset;
+- combo dataset;
+- engine version;
+
+the engine MUST produce the same assessment.
+
+Network availability MUST NOT change the result after required data has been resolved and cached.
+
+---
+
+## 3.5 No magic scoring
+
+The engine MUST NOT reduce the entire deck to an arbitrary score such as:
+
+```text
+power = 8.7
+```
+
+or:
+
+```text
+score = 73
+```
+
+unless such a score is explicitly defined as a secondary analytical metric.
+
+The primary output is a bracket assessment based on signals and constraints.
+
+---
+
+# 4. Terminology
+
+## 4.1 Deck
+
+A normalized Commander deck consisting of:
+
+- commander(s);
+- main deck;
+- optional companion;
+- metadata.
+
+---
+
+## 4.2 Signal
+
+An observable property of a deck.
+
+Example:
+
+```text
+GAME_CHANGER
+FAST_MANA
+EXTRA_TURN
+MASS_LAND_DENIAL
+TWO_CARD_COMBO
+```
+
+---
+
+## 4.3 Evidence
+
+A concrete observation supporting a signal.
+
+Example:
+
+```text
+Mana Vault is present in the deck.
+```
+
+---
+
+## 4.4 Rule
+
+A formal condition defined by a selected ruleset.
+
+---
+
+## 4.5 Heuristic
+
+An analytical rule created by the project rather than directly prescribed by the official Brackets rules.
+
+---
+
+## 4.6 Assessment
+
+The complete result generated by the engine.
+
+---
+
+## 4.7 Bracket
+
+The estimated Commander Bracket from 1 to 5.
+
+The canonical names are:
+
+| Bracket | Name |
+|---:|---|
+| 1 | Exhibition |
+| 2 | Core |
+| 3 | Upgraded |
+| 4 | Optimized |
+| 5 | cEDH |
+
+The names and definitions MUST be sourced from the selected official ruleset.
+
+---
+
+## 4.8 Floor
+
+The lowest bracket reasonably supported by the detected evidence.
+
+---
+
+## 4.9 Ceiling
+
+The highest bracket reasonably supported by the detected evidence.
+
+---
+
+## 4.10 Confidence
+
+The engine's confidence that the estimated bracket is representative of the deck's observable characteristics.
+
+Confidence is NOT confidence that the deck will win games.
+
+Allowed values:
+
+```text
+low
+medium
+high
+```
+
+---
+
+# 5. Architecture
+
+The engine MUST be divided into independent stages.
+
+```text
+Input
+  │
+  ▼
+Deck Parser
+  │
+  ▼
+Deck Normalizer
+  │
+  ▼
+Card Resolver
+  │
+  ▼
+Deck Validator
+  │
+  ▼
+Signal Extraction
+  │
+  ├── Official Signals
+  │
+  └── Heuristic Signals
+  │
+  ▼
+Evidence Collection
+  │
+  ▼
+Bracket Classifier
+  │
+  ▼
+Confidence Estimator
+  │
+  ▼
+Assessment
+  │
+  ├── JSON
+  ├── Markdown
+  └── HTML
+```
+
+The following layers MUST remain independent:
+
+```text
+Domain
+Analysis
+Data
+API
+Presentation
+```
+
+The domain/analysis layers MUST NOT import FastAPI or Next.js-related code.
+
+---
+
+# 6. Domain Model
+
+The core domain model SHOULD use Pydantic models.
+
+---
+
+## 6.1 Card
+
+```python
+class Card:
+    name: str
+    oracle_id: str
+    mana_cost: str | None
+    mana_value: float
+    type_line: str
+    oracle_text: str
+    colors: list[str]
+    color_identity: list[str]
+```
+
+The project MUST use Scryfall `oracle_id` as the canonical card identity.
+
+Printing-specific identifiers MUST NOT be used for card identity unless the analysis explicitly requires printing information.
+
+This follows the upstream project's data model conventions. 
+
+---
+
+## 6.2 DeckCard
+
+```python
+class DeckCard:
+    card: Card
+    quantity: int
+    category: str | None
+    is_commander: bool
+    is_companion: bool
+```
+
+---
+
+## 6.3 Deck
+
+```python
+class Deck:
+    name: str | None
+    commander: list[DeckCard]
+    cards: list[DeckCard]
+    companion: DeckCard | None
+    source: DeckSource
+```
+
+The engine MUST support partner commanders.
+
+---
+
+# 7. Deck Input Contract
+
+The engine MUST operate on a normalized `Deck`.
+
+Input adapters are responsible for transforming external representations into this model.
+
+Supported adapters MAY include:
+
+```text
+Moxfield
+Archidekt
+Plain text
+JSON
+Manual API input
+```
+
+The engine MUST NOT depend on Moxfield-specific data structures.
+
+---
+
+# 8. Deck Resolution
+
+Card resolution occurs before bracket analysis.
+
+Resolution pipeline:
+
+```text
+Raw decklist
+    ↓
+Card name normalization
+    ↓
+Scryfall resolution
+    ↓
+Oracle ID assignment
+    ↓
+Card model
+    ↓
+Deck model
+```
+
+Unresolved cards MUST be reported.
+
+Example:
+
+```json
+{
+  "warnings": [
+    {
+      "code": "UNRESOLVED_CARD",
+      "card_name": "Example Card"
+    }
+  ]
+}
+```
+
+---
+
+# 9. Deck Validation
+
+Before bracket analysis the engine SHOULD validate:
+
+- card count;
+- singleton rules;
+- commander legality;
+- color identity;
+- banned cards;
+- unresolved cards;
+- commander count;
+- companion legality where applicable.
+
+Validation errors MUST be separated from bracket signals.
+
+An illegal deck MAY still be analyzed, but the assessment MUST contain:
+
+```text
+legal: false
+```
+
+and an appropriate warning.
+
+The engine MUST NOT silently analyze an invalid deck as if it were legal.
+
+---
+
+# 10. Ruleset Model
+
+Rules MUST be represented as versioned data.
+
+Recommended structure:
+
+```text
+rules/
+└── commander/
+    ├── 2025-02.yaml
+    ├── 2025-04.yaml
+    ├── 2025-10.yaml
+    └── 2026-02.yaml
+```
+
+Example:
+
+```yaml
+version: "2026-02"
+
+brackets:
+  1:
+    name: Exhibition
+
+  2:
+    name: Core
+
+  3:
+    name: Upgraded
+
+  4:
+    name: Optimized
+
+  5:
+    name: cEDH
+
+game_changers:
+  - oracle_id: ...
+    name: ...
+
+signals:
+  extra_turns:
+    enabled: true
+
+  mass_land_denial:
+    enabled: true
+```
+
+Rules data MUST NOT be hardcoded throughout the analyzer.
+
+---
+
+# 11. Signal Model
+
+Every signal MUST contain:
+
+```python
+class Signal:
+    id: str
+    category: SignalCategory
+    source_type: Literal["official", "heuristic", "data"]
+    strength: Literal["low", "medium", "high"]
+    evidence: list[Evidence]
+    explanation: str
+```
+
+---
+
+## 11.1 Signal categories
+
+Initial categories:
+
+```text
+GAME_CHANGER
+TWO_CARD_COMBO
+COMBO
+EXTRA_TURN
+MASS_LAND_DENIAL
+FAST_MANA
+TUTOR
+INTERACTION
+CARD_ADVANTAGE
+RAMP
+WIN_CONDITION
+CONSISTENCY
+DECK_SPEED
+COMMANDER_SIGNAL
+```
+
+---
+
+# 12. Evidence Model
+
+Evidence is the fundamental explanation unit.
+
+```python
+class Evidence:
+    id: str
+    type: str
+    source: EvidenceSource
+    card_or_cards: list[str]
+    description: str
+    impact: str | None
+```
+
+Example:
+
+```json
+{
+  "id": "ev-001",
+  "type": "game_changer",
+  "source": {
+    "type": "official",
+    "rules_version": "2026-02"
+  },
+  "card_or_cards": [
+    "Farewell"
+  ],
+  "description": "Card is listed as a Game Changer in the selected ruleset.",
+  "impact": "high"
+}
+```
+
+---
+
+# 13. Official Signals
+
+## 13.1 Game Changers
+
+The engine MUST detect cards listed as Game Changers in the selected ruleset.
+
+Detection MUST be based on `oracle_id` rather than card name where possible.
+
+The report MUST show:
+
+```text
+Game Changers: 2
+
+- Card A
+- Card B
+```
+
+The ruleset version MUST be included.
+
+Because the Game Changer list has changed between Brackets revisions, the engine MUST NOT use a single permanent list.
+
+---
+
+# 14. Extra Turns
+
+The engine MUST identify cards capable of generating additional turns where defined by the selected ruleset.
+
+The analyzer SHOULD distinguish:
+
+```text
+single extra-turn spell
+repeatable extra-turn engine
+extra-turn combo
+```
+
+Detection SHOULD be based on card semantics and curated data rather than simple keyword matching alone.
+
+---
+
+# 15. Mass Land Denial
+
+The engine MUST identify relevant mass-land-denial effects where covered by the selected ruleset.
+
+The engine SHOULD distinguish:
+
+```text
+destruction
+exile
+sacrifice
+bounce
+lock
+repeatable denial
+```
+
+Individual land interaction MUST NOT automatically be classified as mass-land denial.
+
+---
+
+# 16. Combo Detection
+
+Combo detection SHOULD use Commander Spellbook or another versioned combo dataset.
+
+The engine MUST distinguish:
+
+```text
+TWO_CARD_COMBO
+MULTI_CARD_COMBO
+INFINITE_COMBO
+WINNING_COMBO
+VALUE_COMBO
+```
+
+The engine MUST NOT assume that every combo is an automatic Bracket 4 or 5 indicator.
+
+A combo is evidence.
+
+Its relevance depends on:
+
+- number of cards;
+- mana requirements;
+- tutor accessibility;
+- redundancy;
+- commander contribution;
+- required setup;
+- estimated speed;
+- deterministic win condition.
+
+---
+
+# 17. Early Combo
+
+The engine SHOULD support an optional heuristic for early deterministic combos.
+
+This is a heuristic unless explicitly defined by the selected official ruleset.
+
+Example:
+
+```text
+combo:
+  cards: 2
+  deterministic: true
+  win_condition: true
+  estimated_turn: 3
+```
+
+The report MUST identify this as:
+
+```text
+heuristic
+```
+
+rather than presenting the estimated turn as an official rule.
+
+---
+
+# 18. Fast Mana
+
+Fast mana is an analytical signal.
+
+Examples MAY include:
+
+- Mana Vault;
+- Mana Crypt;
+- Chrome Mox;
+- Mox Diamond;
+- other cards defined by the project's fast-mana dataset.
+
+The engine SHOULD calculate:
+
+```text
+fast_mana_count
+fast_mana_density
+```
+
+Example:
+
+```json
+{
+  "fast_mana": {
+    "count": 4,
+    "density": 0.04
+  }
+}
+```
+
+Fast mana MUST NOT automatically determine a bracket.
+
+---
+
+# 19. Tutors
+
+Tutor density is a heuristic signal.
+
+The engine SHOULD calculate:
+
+```text
+tutor_count
+tutor_density
+broad_tutor_count
+narrow_tutor_count
+```
+
+Tutor density MUST NOT by itself determine the bracket.
+
+The presence of tutors may contribute to consistency analysis.
+
+---
+
+# 20. Interaction
+
+Interaction SHOULD be categorized into:
+
+```text
+spot_removal
+countermagic
+graveyard_hate
+artifact_enchantment_removal
+board_wipes
+protection
+stack_interaction
+```
+
+The engine SHOULD report counts and density.
+
+Interaction density is informational unless explicitly included by a future ruleset.
+
+---
+
+# 21. Consistency
+
+The engine SHOULD calculate consistency-related metrics separately from bracket classification.
+
+Possible metrics:
+
+```text
+tutor density
+draw density
+redundancy
+mana acceleration
+curve
+commander dependency
+combo redundancy
+```
+
+These metrics MUST NOT be conflated with official bracket rules.
+
+---
+
+# 22. Deck Speed
+
+Deck speed is a heuristic.
+
+Possible indicators:
+
+```text
+average mana value
+fast mana
+low-cost interaction
+tutor density
+combo cost
+commander cost
+win-condition cost
+```
+
+The engine MAY produce:
+
+```text
+estimated_speed:
+    low
+    medium
+    high
+```
+
+This MUST be clearly marked as heuristic.
+
+---
+
+# 23. Bracket Classification
+
+The classifier MUST operate on extracted signals.
+
+It MUST NOT inspect raw card text directly.
+
+Architecture:
+
+```text
+Deck
+ ↓
+Signals
+ ↓
+Classifier
+ ↓
+Assessment
+```
+
+---
+
+# 24. Classification Model
+
+The classifier MUST produce:
+
+```python
+class BracketAssessment:
+    bracket: int
+    bracket_name: str
+
+    minimum_bracket: int
+    maximum_bracket: int
+
+    confidence: Confidence
+
+    official_signals: list[Signal]
+    heuristic_signals: list[Signal]
+
+    evidence: list[Evidence]
+
+    warnings: list[Warning]
+```
+
+---
+
+# 25. Bracket Range
+
+The engine SHOULD support uncertainty.
+
+Example:
+
+```json
+{
+  "bracket": 3,
+  "minimum_bracket": 3,
+  "maximum_bracket": 4,
+  "confidence": "medium"
+}
+```
+
+Interpretation:
+
+> The observable characteristics most strongly indicate Bracket 3, but the deck contains characteristics associated with Bracket 4.
+
+---
+
+# 26. Classification Rules
+
+Classification SHOULD be implemented as a sequence of constraints rather than arbitrary point scoring.
+
+Conceptually:
+
+```text
+Deck
+ │
+ ├── Official constraints
+ │
+ ├── Official signals
+ │
+ └── Heuristic signals
+       │
+       ▼
+   Candidate brackets
+       │
+       ▼
+   Bracket range
+       │
+       ▼
+   Estimated bracket
+```
+
+The classifier MUST preserve the difference between:
+
+```text
+required
+suggestive
+supporting
+contradictory
+```
+
+signals.
+
+---
+
+# 27. Signal Strength
+
+Signals SHOULD have a strength:
+
+### High
+
+Directly relevant to classification.
+
+### Medium
+
+Strong supporting evidence.
+
+### Low
+
+Contextual evidence.
+
+Example:
+
+```text
+Game Changer
+→ high
+
+Fast mana density
+→ medium
+
+Average mana value
+→ low
+```
+
+---
+
+# 28. Contradictory Evidence
+
+The engine MUST support contradictory signals.
+
+Example:
+
+```text
+Strong fast mana
++
+No Game Changers
++
+No deterministic combo
++
+High average mana value
+```
+
+The classifier MUST NOT simply sum these characteristics.
+
+It should instead preserve them as separate evidence.
+
+---
+
+# 29. Confidence
+
+Confidence SHOULD be calculated from:
+
+- card resolution completeness;
+- ruleset availability;
+- signal completeness;
+- combo data completeness;
+- ambiguity;
+- contradictory evidence.
+
+Example:
+
+```text
+HIGH
+
+All cards resolved.
+Ruleset available.
+No major unresolved signals.
+```
+
+```text
+MEDIUM
+
+Cards resolved.
+Combo dataset incomplete.
+Some classification ambiguity.
+```
+
+```text
+LOW
+
+Unresolved cards.
+Missing commander.
+Unknown combo data.
+Incomplete ruleset.
+```
+
+---
+
+# 30. Assessment Output
+
+Canonical JSON:
+
+```json
+{
+  "schema_version": "1.0",
+  "engine_version": "0.1.0",
+  "rules_version": "2026-02",
+  "data_version": "2026-09-14",
+
+  "deck": {
+    "name": "Example Deck",
+    "commander": [
+      "Example Commander"
+    ],
+    "card_count": 100,
+    "legal": true
+  },
+
+  "assessment": {
+    "bracket": 3,
+    "name": "Upgraded",
+    "minimum": 3,
+    "maximum": 4,
+    "confidence": "high"
+  },
+
+  "official_signals": [],
+
+  "heuristic_signals": [],
+
+  "evidence": [],
+
+  "warnings": []
+}
+```
+
+---
+
+# 31. Schema Versioning
+
+The report schema MUST have an independent version.
+
+Example:
+
+```text
+schema_version = 1.0
+engine_version = 0.1.0
+rules_version = 2026-02
+```
+
+These values MUST NOT be conflated.
+
+A rules update does not necessarily require an engine update.
+
+An engine update does not necessarily change the ruleset.
+
+---
+
+# 32. Warning Model
+
+Warnings MUST be structured.
+
+Example:
+
+```json
+{
+  "code": "UNRESOLVED_CARD",
+  "severity": "error",
+  "message": "Card could not be resolved."
+}
+```
+
+Suggested codes:
+
+```text
+UNRESOLVED_CARD
+INVALID_DECK_SIZE
+INVALID_COMMANDER
+BANNED_CARD
+UNKNOWN_RULESET
+INCOMPLETE_CARD_DATA
+INCOMPLETE_COMBO_DATA
+AMBIGUOUS_COMBO
+LOW_CONFIDENCE
+```
+
+---
+
+# 33. Errors vs Warnings
+
+An error prevents reliable analysis.
+
+A warning allows analysis but reduces confidence.
+
+Example:
+
+```text
+Unknown commander
+→ error
+
+Missing optional combo data
+→ warning
+```
+
+The API MUST expose these states without throwing raw implementation exceptions to clients.
+
+---
+
+# 34. Report Generation
+
+The engine SHOULD provide a canonical assessment model.
+
+Report formatters MUST consume the assessment.
+
+```text
+Assessment
+   ├── JSON formatter
+   ├── Markdown formatter
+   └── HTML formatter
+```
+
+The HTML renderer MUST NOT contain bracket logic.
+
+---
+
+# 35. Human-readable report
+
+A report SHOULD have the following structure:
+
+```text
+Commander Bracket Assessment
+
+Bracket 3 — Upgraded
+
+Confidence: High
+Likely range: 3–4
+
+Why?
+
+Official Signals
+----------------
+...
+
+Heuristic Signals
+-----------------
+...
+
+Evidence
+--------
+...
+
+Warnings
+--------
+...
+
+Methodology
+-----------
+...
+```
+
+---
+
+# 36. Methodology Disclosure
+
+Every report MUST disclose that:
+
+1. the result is an analytical estimate;
+2. official rules and project heuristics are separate;
+3. the selected ruleset version is shown;
+4. the result does not replace Rule Zero discussion.
+
+Example:
+
+> This assessment is an automated estimate based on the selected Commander Brackets ruleset and additional analytical heuristics. It is not an official Wizards of the Coast classification.
+
+---
+
+# 37. Data Sources
+
+The engine MAY consume:
+
+### Scryfall
+
+Used for:
+
+- card identity;
+- Oracle text;
+- mana value;
+- type;
+- color identity;
+- legality;
+- rulings.
+
+The upstream project already uses Scryfall data and recommends bulk/local data rather than excessive live requests.
+
+### Commander Spellbook
+
+Used for:
+
+- combo detection;
+- combo components;
+- combo results.
+
+### Official Commander Brackets documentation
+
+Used for:
+
+- bracket definitions;
+- Game Changers;
+- official bracket-related constraints.
+
+External sources MUST be versioned or timestamped where possible.
+
+---
+
+# 38. Data Cache
+
+The engine SHOULD use local cached data.
+
+Recommended:
+
+```text
+data/
+├── mtg.sqlite
+├── scryfall/
+├── spellbook/
+└── rules/
+```
+
+Runtime analysis SHOULD prefer local data.
+
+External APIs SHOULD be used primarily for:
+
+- initial refresh;
+- explicit update;
+- missing data recovery.
+
+---
+
+# 39. Network Independence
+
+Tests MUST NOT require network access.
+
+Tests SHOULD use:
+
+```text
+fixtures
+mocks
+snapshots
+local SQLite
+```
+
+This follows the upstream project's development requirement that tests run without network access.
+
+---
+
+# 40. Deterministic Testing
+
+Every signal SHOULD have unit tests.
+
+Example:
+
+```text
+tests/
+└── bracket/
+    ├── test_game_changers.py
+    ├── test_extra_turns.py
+    ├── test_land_denial.py
+    ├── test_fast_mana.py
+    ├── test_tutors.py
+    ├── test_combos.py
+    └── test_classifier.py
+```
+
+---
+
+# 41. Fixture Decks
+
+The project SHOULD maintain synthetic fixtures representing known characteristics.
+
+```text
+tests/fixtures/decks/
+├── bracket-1/
+├── bracket-2/
+├── bracket-3/
+├── bracket-4/
+├── bracket-5/
+├── game-changer/
+├── combo/
+├── fast-mana/
+└── ambiguous/
+```
+
+Fixtures MUST NOT include copyrighted card database dumps.
+
+They may contain decklists consisting of card names.
+
+---
+
+# 42. Golden Tests
+
+The engine SHOULD support golden assessment tests.
+
+Example:
+
+```json
+{
+  "deck": "fixture-bracket-3",
+  "expected": {
+    "bracket": 3,
+    "minimum": 3
+  }
+}
+```
+
+Golden tests MUST include the ruleset version.
+
+---
+
+# 43. Regression Testing
+
+Whenever a classification changes, the test suite SHOULD identify:
+
+```text
+previous result
+new result
+changed signal
+changed evidence
+ruleset version
+```
+
+This is particularly important when updating:
+
+- Game Changers;
+- combo datasets;
+- card classifications;
+- heuristics.
+
+---
+
+# 44. Ruleset Updates
+
+When official Commander Brackets rules change:
+
+1. create a new ruleset;
+2. do not overwrite the previous ruleset;
+3. update ruleset tests;
+4. run regression tests;
+5. document changed signals;
+6. update `rules_version`;
+7. update fixtures where necessary.
+
+Example:
+
+```text
+2026-02
+    ↓
+2026-XX
+```
+
+must preserve both versions.
+
+---
+
+# 45. Engine Versioning
+
+Use Semantic Versioning:
+
+```text
+MAJOR.MINOR.PATCH
+```
+
+### MAJOR
+
+Breaking domain or report contract.
+
+### MINOR
+
+New signals or functionality without breaking consumers.
+
+### PATCH
+
+Bug fixes and non-breaking corrections.
+
+---
+
+# 46. Rules Version vs Engine Version
+
+Example:
+
+```text
+Engine: 0.4.0
+Rules: 2026-02
+```
+
+A future run may be:
+
+```text
+Engine: 0.4.0
+Rules: 2026-XX
+```
+
+The engine can therefore analyze historical decks using historical rules.
+
+---
+
+# 47. API Boundary
+
+The API MUST consume and return domain models.
+
+It MUST NOT implement classification logic.
+
+Correct:
+
+```text
+POST /analyze
+      ↓
+AnalyzerService
+      ↓
+BracketEngine
+      ↓
+Assessment
+      ↓
+API response
+```
+
+Incorrect:
+
+```text
+POST /analyze
+      ↓
+FastAPI route
+      ↓
+if game_changers > 3:
+    bracket = 4
+```
+
+## 47.1 API Authentication
+
+The API MUST require authentication via `API_KEY`.
+This key MUST be configured in a local `.env` file.
+Requests missing a valid key (e.g., via `X-API-Key` header or `Bearer` token) MUST be rejected with HTTP 401 Unauthorized.
+This ensures the local engine remains secure from unauthorized network access.
+
+---
+
+# 48. Next.js Boundary
+
+Next.js is a presentation layer.
+
+It SHOULD:
+
+- collect deck input;
+- submit analysis;
+- render assessment;
+- render evidence;
+- render methodology;
+- render warnings;
+- authenticate backend calls using `API_KEY` from its own `.env`.
+
+It MUST NOT determine the bracket.
+
+The browser MUST NOT contain the canonical bracket algorithm.
+
+---
+
+# 49. Docker Boundary
+
+Docker provides deployment/runtime isolation.
+
+Docker MUST NOT influence the engine's classification.
+
+The engine SHOULD work:
+
+```text
+inside Docker
+```
+
+and:
+
+```text
+outside Docker
+```
+
+with the same result.
+
+---
+
+# 50. Recommended Docker Services
+
+Initial deployment MUST use Docker Compose, targeting Coolify.
+
+```text
+docker-compose.yml
+```
+
+Services:
+
+```text
+web
+  Next.js
+  Port: 3000
+  Env: API_URL, API_KEY
+  Coolify: Gerencia roteamento público e HTTPS.
+
+api (engine)
+  Python
+  FastAPI
+  Bracket Engine
+  SQLite
+  Port: 8000
+  Env: API_KEY
+  Volumes: volume nomeado para manter db SQLite persistente entre deploys.
+```
+
+Both services MUST share a Docker network.
+Next.js communicates with FastAPI via internal Docker network (`http://api:8000`).
+The `.env` variables MUST be injected via Coolify UI, synchronizing `API_KEY` between `web` and `api`.
+
+---
+
+# 51. Service API
+
+Initial endpoints:
+
+```text
+GET  /health
+
+POST /api/v1/analyze
+POST /api/v1/analyze/moxfield
+
+GET  /api/v1/rulesets
+GET  /api/v1/rulesets/{version}
+```
+
+Future endpoints MAY include:
+
+```text
+POST /api/v1/decks/import
+GET  /api/v1/reports/{id}
+POST /api/v1/compare
+```
+
+---
+
+# 52. Moxfield Import
+
+Moxfield support MUST be implemented as an adapter.
+
+```text
+MoxfieldImporter
+       ↓
+Deck
+```
+
+The bracket engine MUST NOT know that Moxfield exists.
+
+The importer SHOULD accept:
+
+```text
+public deck URL
+deck identifier
+exported decklist
+```
+
+The implementation MUST respect Moxfield's public access mechanisms and MUST NOT rely on private authenticated endpoints unless explicitly supported by the project.
+
+---
+
+# 53. Analysis Pipeline
+
+Canonical pipeline:
+
+```python
+def analyze(deck: Deck, context: AnalysisContext) -> BracketAssessment:
+
+    normalized = normalize(deck)
+
+    validated = validate(normalized)
+
+    resolved = resolve_cards(validated)
+
+    official = extract_official_signals(
+        resolved,
+        context.ruleset,
+    )
+
+    heuristic = extract_heuristic_signals(
+        resolved,
+        context,
+    )
+
+    evidence = collect_evidence(
+        official,
+        heuristic,
+    )
+
+    assessment = classify(
+        resolved,
+        official,
+        heuristic,
+        evidence,
+        context.ruleset,
+    )
+
+    return assessment
+```
+
+---
+
+# 54. Analysis Context
+
+The engine SHOULD receive an immutable context.
+
+```python
+class AnalysisContext:
+    ruleset: Ruleset
+    card_database: CardDatabase
+    combo_database: ComboDatabase | None
+    data_version: str
+    engine_version: str
+```
+
+This makes tests and historical analysis reproducible.
+
+---
+
+# 55. No Global State
+
+The engine MUST avoid mutable global configuration.
+
+Bad:
+
+```python
+CURRENT_RULESET = ...
+```
+
+Preferred:
+
+```python
+engine = BracketEngine(
+    ruleset=ruleset,
+    card_database=database,
+)
+```
+
+This allows two different rulesets to be tested simultaneously.
+
+---
+
+# 56. Extensibility
+
+The signal system SHOULD use a plugin-like architecture.
+
+Example:
+
+```python
+class SignalAnalyzer(Protocol):
+
+    def analyze(
+        self,
+        deck: Deck,
+        context: AnalysisContext,
+    ) -> list[Signal]:
+        ...
+```
+
+Implementations:
+
+```text
+GameChangerAnalyzer
+ComboAnalyzer
+FastManaAnalyzer
+TutorAnalyzer
+ExtraTurnAnalyzer
+MassLandDenialAnalyzer
+```
+
+---
+
+# 57. Classifier Interface
+
+```python
+class BracketClassifier(Protocol):
+
+    def classify(
+        self,
+        deck: Deck,
+        signals: list[Signal],
+        ruleset: Ruleset,
+    ) -> BracketAssessment:
+        ...
+```
+
+The classifier MUST NOT access external services.
+
+---
+
+# 58. Explainability Contract
+
+Every classification MUST have at least one explanation.
+
+Example:
+
+```json
+{
+  "assessment": {
+    "bracket": 3
+  },
+  "explanation": {
+    "summary": "The deck exhibits characteristics consistent with Bracket 3.",
+    "primary_reasons": [
+      "Contains 2 Game Changers.",
+      "Contains no detected mass-land-denial package.",
+      "Contains no detected early deterministic combo."
+    ]
+  }
+}
+```
+
+---
+
+# 59. Uncertainty Contract
+
+If evidence is insufficient, the engine MUST say so.
+
+Example:
+
+```json
+{
+  "assessment": {
+    "bracket": 3,
+    "minimum": 2,
+    "maximum": 4,
+    "confidence": "low"
+  },
+  "warnings": [
+    {
+      "code": "INCOMPLETE_COMBO_DATA"
+    }
+  ]
+}
+```
+
+The engine MUST prefer uncertainty over fabricated precision.
+
+---
+
+# 60. Comparison
+
+Future versions MAY compare two or more assessments.
+
+Example:
+
+```text
+Deck A
+Bracket 3
+Range 3–4
+
+Deck B
+Bracket 3
+Range 2–3
+
+Compatibility:
+Likely
+```
+
+This MUST remain a separate feature from bracket classification.
+
+---
+
+# 61. Pod Compatibility
+
+Pod compatibility MUST NOT be inferred directly from bracket alone.
+
+Future compatibility analysis MAY use:
+
+```text
+bracket
+bracket range
+intent
+speed
+combo profile
+```
+
+but must remain a separate analytical layer.
+
+---
+
+# 62. Intent
+
+Player intent is not reliably observable from a decklist.
+
+The engine MUST NOT infer:
+
+```text
+"player intends to play cEDH"
+```
+
+from cards alone.
+
+Future versions MAY accept explicit user-provided metadata:
+
+```json
+{
+  "intent": "casual"
+}
+```
+
+Possible values:
+
+```text
+casual
+optimized
+competitive
+cedh
+unknown
+```
+
+This metadata MUST remain separate from deck-derived evidence.
+
+---
+
+# 63. Human Override
+
+The UI MAY allow the player to indicate:
+
+```text
+"My intended bracket is 4."
+```
+
+The engine MUST preserve this as:
+
+```text
+declared_bracket
+```
+
+and MUST NOT overwrite its analytical assessment.
+
+Example:
+
+```json
+{
+  "assessment": {
+    "bracket": 3
+  },
+  "player_declaration": {
+    "bracket": 4
+  }
+}
+```
+
+---
+
+# 64. Auditability
+
+Every assessment SHOULD be reproducible from:
+
+```text
+deck input
+rules version
+engine version
+card data version
+combo data version
+```
+
+A report SHOULD expose these values.
+
+---
+
+# 65. Privacy
+
+The engine SHOULD support fully local operation.
+
+Decklists SHOULD NOT be transmitted to third-party services unless required for explicit external imports or data refresh.
+
+User deck data MUST NOT be committed to Git.
+
+The upstream project follows the same local-data principle and keeps deck and collection data outside the repository.
+
+---
+
+# 66. External API Policy
+
+External API requests MUST:
+
+- use descriptive User-Agent headers;
+- respect rate limits;
+- use retries with backoff;
+- prefer bulk data;
+- cache results;
+- avoid unnecessary requests.
+
+The upstream project explicitly recommends bulk/local Scryfall data and throttling requests.
+
+---
+
+# 67. Security
+
+The API MUST validate:
+
+- URLs;
+- input sizes;
+- decklist size;
+- JSON payloads;
+- external responses.
+
+Moxfield or other external URLs MUST NOT be treated as arbitrary filesystem paths.
+
+The application MUST avoid SSRF vulnerabilities when implementing URL import.
+
+---
+
+# 68. Performance
+
+The first version SHOULD target:
+
+```text
+local deck analysis < 1 second
+```
+
+after data is cached.
+
+External data acquisition is excluded from this target.
+
+The engine SHOULD NOT perform network requests during ordinary classification.
+
+---
+
+# 69. Logging
+
+Logs MUST contain:
+
+```text
+request/analysis ID
+engine version
+rules version
+analysis duration
+resolution status
+```
+
+Logs SHOULD NOT contain complete private decklists by default.
+
+---
+
+# 70. Observability
+
+Future versions MAY expose:
+
+```text
+analysis_duration
+cards_resolved
+cards_unresolved
+signals_detected
+combo_queries
+cache_hits
+```
+
+These metrics MUST NOT alter classification.
+
+---
+
+# 71. CLI
+
+A CLI MAY expose:
+
+```bash
+mtg-bracket analyze deck.txt
+```
+
+and:
+
+```bash
+mtg-bracket analyze \
+  --rules 2026-02 \
+  deck.txt
+```
+
+The CLI MUST call the same service used by the API.
+
+---
+
+# 72. Example CLI Output
+
+```text
+Commander Bracket Assessment
+─────────────────────────────
+
+Deck: Atraxa Infect
+Commander: Atraxa, Praetors' Voice
+
+Bracket:
+  3 — Upgraded
+
+Likely range:
+  3–4
+
+Confidence:
+  HIGH
+
+Official signals:
+  Game Changers: 2
+  Extra Turns: 0
+  Mass Land Denial: 0
+  Detected Combos: 1
+
+Heuristic signals:
+  Fast Mana: High
+  Tutor Density: Medium
+  Interaction: High
+
+Primary evidence:
+  ✓ Farewell
+  ✓ Rhystic Study
+  ✓ Thassa's Oracle + Demonic Consultation
+
+Warnings:
+  None
+```
+
+---
+
+# 73. HTML Report Contract
+
+The HTML report SHOULD contain:
+
+1. deck identity;
+2. bracket;
+3. range;
+4. confidence;
+5. official signals;
+6. heuristic signals;
+7. evidence;
+8. warnings;
+9. methodology;
+10. data versions.
+
+The report SHOULD be usable without JavaScript after generation.
+
+---
+
+# 74. Next.js UI Contract
+
+The frontend SHOULD initially contain:
+
+```text
+/
+├── Analyze
+├── Result
+├── Methodology
+└── Rulesets
+```
+
+The result page SHOULD prioritize:
+
+```text
+Bracket
+Why
+Evidence
+Warnings
+```
+
+rather than overwhelming users with raw statistics.
+
+---
+
+# 75. Accessibility
+
+The web interface SHOULD support:
+
+- keyboard navigation;
+- semantic HTML;
+- accessible contrast;
+- screen-reader labels;
+- reduced motion;
+- responsive layouts.
+
+Bracket classification MUST remain understandable without color.
+
+---
+
+# 76. Open Source Strategy
+
+The project uses:
+
+```text
+origin
+→ johnywalves/mtg-bracket-analyzer
+
+upstream
+→ QuackQuackLabs/MTG-Analyzer
+```
+
+The project SHOULD preserve compatibility with useful upstream infrastructure while allowing independent evolution of the Bracket Engine.
+
+Upstream code should be treated as infrastructure/reference, not as the authoritative source for Bracket methodology.
+
+---
+
+# 77. Upstream Synchronization
+
+Upstream updates SHOULD be integrated deliberately.
+
+Process:
+
+```bash
+git fetch upstream
+git log --oneline main..upstream/main
+git diff main...upstream/main
+```
+
+Then merge or cherry-pick selected changes.
+
+The project MUST NOT blindly merge upstream changes that alter bracket methodology.
+
+---
+
+# 78. Attribution
+
+When code or architecture is derived from upstream, project documentation MUST preserve appropriate attribution and license requirements.
+
+The upstream project is MIT licensed.
+
+---
+
+# 79. Legal / Data Separation
+
+Source code licensing does not automatically apply to external card data, images, rulings, or third-party datasets.
+
+The application MUST preserve the terms applicable to:
+
+- Scryfall;
+- Commander Spellbook;
+- Wizards of the Coast;
+- any future external data source.
+
+The upstream project explicitly separates its MIT source code from external card data and images.
+
+---
+
+# 80. Non-Goals for Version 0.1
+
+Version 0.1 MUST NOT attempt to:
+
+- reproduce all Magic rules;
+- predict game winners;
+- simulate complete games;
+- calculate a universal power score;
+- determine player intent automatically;
+- replace Rule Zero;
+- guarantee bracket correctness;
+- scrape private Moxfield data;
+- depend on live APIs during analysis.
+
+---
+
+# 81. Definition of Done — Engine v0.1
+
+The engine is considered complete when:
+
+- [ ] A Moxfield deck can be normalized into `Deck`.
+- [ ] All cards are resolved through the local card database.
+- [ ] Unresolved cards are reported.
+- [ ] Ruleset version is explicit.
+- [ ] Game Changers are detected.
+- [ ] Extra turns are detected.
+- [ ] Mass-land-denial signals are detected.
+- [ ] Combo data can be consumed.
+- [ ] Fast-mana analysis exists.
+- [ ] Tutor analysis exists.
+- [ ] Signals distinguish official vs heuristic.
+- [ ] Evidence is generated.
+- [ ] Bracket assessment is deterministic.
+- [ ] Bracket range is supported.
+- [ ] Confidence is supported.
+- [ ] JSON output is versioned.
+- [ ] Markdown report is generated.
+- [ ] Unit tests cover every official signal.
+- [ ] Tests run without network.
+- [ ] Engine runs independently of FastAPI.
+- [ ] Engine runs inside Docker.
+- [ ] Engine runs outside Docker.
+- [ ] No classification logic exists in Next.js.
+
+---
+
+# 82. Definition of Done — Web v0.1
+
+The web application is considered complete when:
+
+- [ ] User can paste a Moxfield URL.
+- [ ] User can paste a decklist.
+- [ ] User can select a ruleset.
+- [ ] User can start analysis.
+- [ ] User can see Bracket.
+- [ ] User can see bracket range.
+- [ ] User can see confidence.
+- [ ] User can see official signals.
+- [ ] User can see heuristic signals.
+- [ ] User can inspect evidence.
+- [ ] User can inspect warnings.
+- [ ] User can read methodology.
+- [ ] Next.js never calculates the bracket.
+- [ ] API and engine are separate.
+- [ ] Entire application runs with Docker Compose.
+
+---
+
+# 83. Future Versions
+
+Potential future functionality:
+
+```text
+v0.2
+  Combo improvements
+  Better evidence
+  HTML reports
+
+v0.3
+  Moxfield URL import
+  Next.js UI
+  Docker Compose
+
+v0.4
+  Deck comparison
+  Historical assessments
+
+v0.5
+  Pod compatibility
+
+v0.6
+  User-declared intent
+
+v1.0
+  Stable API
+  Stable assessment schema
+  Versioned rulesets
+```
+
+Version numbers are indicative and do not constitute a commitment to a release schedule.
+
+---
+
+# 84. Core Contract
+
+The essential contract of the Bracket Engine is:
+
+```text
+INPUT
+  Deck
+  Ruleset
+  Card Data
+  Combo Data
+
+PROCESS
+  Normalize
+  Resolve
+  Validate
+  Extract Signals
+  Collect Evidence
+  Classify
+  Estimate Confidence
+
+OUTPUT
+  Bracket Assessment
+```
+
+The engine MUST preserve the following distinction:
+
+```text
+                  BRACKET ASSESSMENT
+                          │
+             ┌────────────┴────────────┐
+             │                         │
+       Official evidence        Project heuristics
+             │                         │
+       Ruleset-derived            Analytical
+             │                         │
+             └────────────┬────────────┘
+                          │
+                     Explanation
+```
+
+The project should therefore be understood as:
+
+> **An open-source, versioned and explainable implementation for analyzing Commander Brackets — not an official authority for determining how a deck must be classified.**
+
+---
+
+# 85. Guiding Principle
+
+When the engine has to choose between:
+
+```text
+false precision
+```
+
+and:
+
+```text
+transparent uncertainty
+```
+
+it MUST choose:
+
+```text
+transparent uncertainty
+```
+
+The primary product of the engine is not a number.
+
+It is:
+
+```text
+Bracket
++
+Evidence
++
+Reasoning
++
+Uncertainty
++
+Version
+```
+
+That combination is the foundation of the MTG Bracket Analyzer.
+::: 
+
+### Próxima etapa recomendada
+
+Eu colocaria esse arquivo primeiro e, em seguida, criaria **`docs/spec/assessment-schema.md`** com os modelos Pydantic exatos (`Deck`, `Signal`, `Evidence`, `BracketAssessment`, `Warning` etc.). Só depois implementaria o `BracketEngine`.
+
+Isso nos dá uma sequência muito segura:
+
+```text
+bracket-engine.md
+       ↓
+assessment-schema.md
+       ↓
+rules/2026-02.yaml
+       ↓
+unit tests / fixtures
+       ↓
+BracketEngine
+       ↓
+FastAPI
+       ↓
+Next.js
+       ↓
+Docker Compose
+```
+
+E evita o problema de começar pela UI e depois descobrir que o contrato da engine precisa ser refeito.

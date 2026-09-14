@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - API_URL=http://api:8000
+      - API_KEY=${API_KEY}
+    networks:
+      - mtg_network
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - API_KEY=${API_KEY}
+    volumes:
+      - mtg_data:/app/data
+    networks:
+      - mtg_network
+
+networks:
+  mtg_network:
+    driver: bridge
+
+volumes:
+  mtg_data:
+    name: mtg_data_vol
