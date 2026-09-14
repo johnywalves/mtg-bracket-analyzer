@@ -4,11 +4,12 @@ services:
   web:
     build:
       context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
-      - API_URL=http://api:8000
-      - API_KEY=${API_KEY}
+      - VITE_API_URL=${API_URL:-http://api:8000}
+      - VITE_API_KEY=${API_KEY}
     networks:
       - mtg_network
     depends_on:
@@ -16,7 +17,8 @@ services:
 
   api:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
     environment:
