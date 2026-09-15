@@ -29,6 +29,13 @@ DEFAULT_HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json"}
 # Politeness: Scryfall asks for <10 req/s; ~100 ms between requests is the safe value.
 REQUEST_DELAY_SECONDS = 0.1
 
+# Live-API response cache (see data/scryfall_cache.py) — avoids re-hitting Scryfall
+# for repeat autocomplete/named/search/collection lookups. TTL matches the ~12h
+# cadence Scryfall regenerates its own bulk data on, so cached data is never
+# staler than what a fresh bulk re-ingest would give you.
+SCRYFALL_CACHE_PATH = SCRYFALL_DIR / "cache.db"
+SCRYFALL_CACHE_TTL_SECONDS = 12 * 3600
+
 # Bulk-data types we ingest (see scryfall-api skill for the full catalog).
 BULK_ORACLE_CARDS = "oracle_cards"
 BULK_RULINGS = "rulings"

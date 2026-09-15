@@ -102,6 +102,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Update inline as work com
 - [x] `data/scryfall_client.py` (httpx async, custom UA/Accept, ~100 ms throttle, 429 backoff):
       `/cards/named` (fuzzy/exact), `/cards/autocomplete`, `/cards/search`, `POST /cards/collection`
       (auto-chunked ≤75).
+- [x] `data/scryfall_cache.py`: SQLite TTL cache (default 12h, matching the bulk-data refresh
+      cadence) in front of every live-API call. `collection` caches per-identifier (both hits and
+      not-found), so overlapping decklist/inventory resolutions cost one network round-trip total.
+      Enabled by default (`ScryfallClient(cache=True)`); pass `cache=False` or a shared
+      `ScryfallCache` instance to disable/share it.
 - [x] Rulings lookup from bulk file, joined on `oracle_id`.
 - [x] Tests (no network): ingest fixture, name/front-face resolution, DFC parsing, rulings join,
       client header/chunk/429 behavior via MockTransport. CLI `mtg data refresh` / `mtg card`.
@@ -811,3 +816,13 @@ Four-stage funnel (full detail in the **`mtg-data-ecosystem`** skill):
   to a `JobRunner` and poll. 7 new tests (3 service, 2 jobs, 1 metagame-progress, 1 serialization);
   **152 tests, ruff + mypy clean.** Remaining for the UI phase: versioned route schemas + UI honesty
   framing. **P0+P1 done → ready to build the web app.**
+- **2026-09-15** — **Bracket Engine pipeline wired end-to-end** (separate track, see
+  [docs/spec/bracket-engine.md](docs/spec/bracket-engine.md), not a phase above): decklist text →
+  `BracketService.analyze_decklist` (parse → resolve → `bracket_adapter.to_assessment_deck` →
+  `BracketEngine.analyze` → `bracket_report.render_markdown`) → `POST /api/v1/analyze`. Kept out of
+  `service.AnalyzerService`/`pyproject.toml` deliberately — this fork tracks an `upstream` remote and
+  those files are still upstream-identical; the new orchestration lives in the fork-only
+  `bracket_service.py` instead (opens its own sqlite connection per call — FastAPI's sync-route
+  threadpool doesn't guarantee the same thread across calls). 8 new tests; **160 tests, ruff + mypy
+  clean.** Scope was plumbing + the existing Game Changer/validation signals only — deepening the
+  heuristic signal set (fast mana, tutors, combos, speed) is a later change.
