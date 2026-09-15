@@ -1,25 +1,25 @@
 version: '3.8'
 
 services:
-  web:
+  web_bracket:
     build:
-      context: ./frontend
+      context: ./web
       dockerfile: Dockerfile
     expose:
       - "3000"
     restart: unless-stopped
     environment:
-      - VITE_API_URL=${API_URL:-http://api:8000}
-      - VITE_API_KEY=${API_KEY}
+      - MTG_API_URL=${API_URL:-http://api_bracket:8000}
+      - MTG_API_KEY=${API_KEY}
     depends_on:
-      - api
+      - api_bracket
 
-  api:
+  api_bracket:
     build:
       context: .
       dockerfile: backend/Dockerfile
     # No expose/ports published: the api stays internal-only, reachable by
-    # `web` over the Docker network Coolify injects. Never routed by Traefik.
+    # `web_bracket` over the Docker network Coolify injects. Never routed by Traefik.
     restart: unless-stopped
     environment:
       - API_KEY=${API_KEY}

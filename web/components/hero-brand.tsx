@@ -13,16 +13,7 @@ export function HeroBrand() {
           width={408}
           height={612}
           priority
-          className="pointer-events-none absolute inset-0 -z-10 h-auto w-[110%] -translate-x-1/2 -translate-y-1/2 select-none brightness-[10] top-1/2 left-1/2"
-        />
-        <Image
-          src="/capywitch.png"
-          alt=""
-          aria-hidden="true"
-          width={408}
-          height={612}
-          priority
-          className="pointer-events-none relative h-auto w-full select-none"
+          className="pointer-events-none z-0 relative h-auto w-full select-none"
         />
       </div>
       <div className="flex flex-col">

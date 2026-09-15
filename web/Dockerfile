@@ -11,11 +11,15 @@ RUN npm run build
 FROM node:22-alpine AS run
 
 WORKDIR /app
+ENV NODE_ENV=production
 
-RUN npm install -g serve
+COPY --from=build /app/package.json /app/package-lock.json ./
+RUN npm ci --omit=dev
 
-COPY --from=build /app/dist ./dist
+COPY --from=build /app/.next ./.next
+COPY --from=build /app/public ./public
+COPY --from=build /app/next.config.ts ./next.config.ts
 
 EXPOSE 3000
 
-CMD ["serve", "-s", "dist", "-l", "tcp://0.0.0.0:3000"]
+CMD ["npm", "run", "start", "--", "-p", "3000", "-H", "0.0.0.0"]

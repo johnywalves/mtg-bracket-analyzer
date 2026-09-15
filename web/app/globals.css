@@ -31,10 +31,14 @@ body {
   font-weight: 800;
   letter-spacing: -0.02em;
   color: transparent;
-  background: linear-gradient(135deg, var(--color-accent-secondary), var(--color-accent-primary));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-accent-secondary) 70%, black),
+    color-mix(in srgb, var(--color-accent-primary) 70%, black)
+  );
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-stroke: 3px #ffffff;
   paint-order: stroke fill;
-  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.3));
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.3)) drop-shadow(0 0 6px rgba(255, 255, 255, 0.6));
 }
