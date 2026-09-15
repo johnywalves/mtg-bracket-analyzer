@@ -5,8 +5,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       - VITE_API_URL=${API_URL:-http://api:8000}
       - VITE_API_KEY=${API_KEY}
@@ -19,8 +19,8 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
       - API_KEY=${API_KEY}
     volumes:
