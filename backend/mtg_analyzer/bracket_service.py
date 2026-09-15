@@ -23,6 +23,7 @@ from mtg_analyzer.analysis.engine import (
     Ruleset,
     load_latest_ruleset,
 )
+from mtg_analyzer.combos.store import ComboStore
 from mtg_analyzer.data.db import CardDatabase
 from mtg_analyzer.data.scryfall_client import ScryfallClient
 from mtg_analyzer.ingest.decklist import parse_deck
@@ -47,7 +48,7 @@ class BracketService:
     scope and reuse it — mirrors `AnalyzerService`'s lazy-resource pattern without depending on it."""
 
     def __init__(self, *, db: CardDatabase | None = None, db_path: Path | None = None,
-                 ruleset: Ruleset | None = None) -> None:
+                 ruleset: Ruleset | None = None, combo_db_path: Path | None = None) -> None:
         # A caller-supplied `db` is used as-is (assumed single-threaded use — a script/CLI, or a
         # test that never crosses threads) and is never closed by this service. Otherwise, since
         # sqlite3 connections are bound to the thread that opened them and FastAPI's sync routes
@@ -57,6 +58,10 @@ class BracketService:
         self._db = db
         self._db_path = db_path
         self._ruleset = ruleset
+        # `combo_db_path` defaults to `config.DB_PATH` inside `ComboStore` itself — same shared
+        # `app.db` the card DB uses. A `ComboStore` is opened/closed per call, same thread-safety
+        # rationale as `_open_db` above.
+        self._combo_db_path = combo_db_path
         self.notes: list[str] = []
 
     def _live_fill_unresolved(self, db: CardDatabase, resolved: ResolvedDeck) -> None:
@@ -108,6 +113,12 @@ class BracketService:
             return self._db
         return CardDatabase(self._db_path)
 
+    def _open_combo_store(self) -> ComboStore:
+        """A connection scoped to the current call/thread — same rationale as `_open_db`. Always
+        succeeds (creates an empty cache on first use), so the engine's `combo_store is None`
+        branch is only exercised by callers/tests that build an `AnalysisContext` directly."""
+        return ComboStore(self._combo_db_path)
+
     @property
     def ruleset(self) -> Ruleset:
         if self._ruleset is None:
@@ -144,8 +155,13 @@ class BracketService:
                 f"Bracket analysis: {len(unresolved)} card(s) could not be resolved and were "
                 "excluded from the assessment.")
 
-        context = AnalysisContext(ruleset=self.ruleset, data_version="local")
-        assessment = BracketEngine(context).analyze(deck)
+        combo_store = self._open_combo_store()
+        try:
+            context = AnalysisContext(ruleset=self.ruleset, data_version="local",
+                                       combo_store=combo_store)
+            assessment = BracketEngine(context).analyze(deck)
+        finally:
+            combo_store.close()
         markdown = render_markdown(assessment, deck, unresolved)
         return BracketReport(deck=resolved, assessment=assessment, unresolved=unresolved,
                              markdown=markdown)

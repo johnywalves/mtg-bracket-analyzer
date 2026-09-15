@@ -850,3 +850,24 @@ Four-stage funnel (full detail in the **`mtg-data-ecosystem`** skill):
   requires `>=3.11`) with no newer interpreter available — resolved via `uv` (`uv python install
   3.12 && uv venv --python 3.12 .venv`); see the updated **Dev setup** in
   [CONTRIBUTING.md](CONTRIBUTING.md).
+- **2026-09-15** — **Bracket Engine: deepened heuristic/official signal set** (the item flagged
+  above as "a later change"). Fetched the official WotC Commander Brackets rules text to ground the
+  classifier: fixed a real bug where the old placeholder sent *any* single Game Changer straight to
+  Bracket 4 (official rule: 1-3 GCs → Bracket 3, only >3 → Bracket 4+). New
+  `analysis/bracket_signals.py` (one function per category, reusing `categorize.py`'s oracle-text
+  regex idiom) adds: `TWO_CARD_COMBO`/`COMBO` (offline via `ComboStore.find_in_deck`, engine stays
+  network-free per §39/§68), `EXTRA_TURN` (single-spell vs. repeatable/chainable), `MASS_LAND_DENIAL`
+  (symmetric/plural land effects only — single-target removal excluded, §15) as **official**
+  signals that gate the bracket floor; and `FAST_MANA` (new curated `fast_mana:` ruleset block,
+  same pattern as `game_changers:`), `TUTOR` (broad/narrow split — tutors are no longer
+  bracket-restricting per the Oct 2025 rules update), `INTERACTION`, `DECK_SPEED` as **heuristic**
+  signals that inform but never determine the bracket (§18/§19). `Ruleset` gained
+  `fast_mana_by_id/name` + `signal_enabled(key)` (finally makes the parsed-but-dead `signals:` yaml
+  block do something — each category is toggleable, defaulting to enabled). `_classify` rewritten
+  as ordered constraint checks (floor/ceiling per official signal, heuristic-driven nudge within
+  that range) rather than the old placeholder — still no weighted/summed scoring, per §3.5.
+  `AnalysisContext` gained an optional `combo_store: ComboStore | None`; `BracketService` opens one
+  per call (same per-call-connection pattern as `_open_db`, new `combo_db_path` param) and
+  `_estimate_confidence` now reports medium confidence with an explicit reason when no combo store
+  is available, instead of silently claiming high confidence on incomplete data. 8 new/updated
+  tests in `tests/test_bracket_engine.py`; **177 tests, ruff + mypy clean.**

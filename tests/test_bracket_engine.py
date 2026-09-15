@@ -7,8 +7,10 @@ from mtg_analyzer.analysis.bracket_report import render_markdown
 from mtg_analyzer.analysis.engine import AnalysisContext, BracketEngine, Ruleset
 from mtg_analyzer.api.app import app
 from mtg_analyzer.bracket_service import BracketService
+from mtg_analyzer.combos.store import ComboStore
 from mtg_analyzer.data.db import CardDatabase
 from mtg_analyzer.models.card import Card
+from mtg_analyzer.models.combo import Combo, ComboCard
 from mtg_analyzer.models.deck import ResolvedDeck, ResolvedEntry
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -74,7 +76,9 @@ def _analysis_deck(entries: list[ResolvedEntry]) -> ResolvedDeck:
     return ResolvedDeck(name="Test", entries=entries)
 
 
-def test_game_changer_pushes_bracket_to_optimized_range() -> None:
+def test_game_changer_pushes_bracket_to_optimized_range(tmp_path: Path) -> None:
+    """1-3 Game Changers → Bracket 3 (Upgraded), per the official rules — only >3 GCs push to
+    Bracket 4+. See `test_four_game_changers_pushes_to_optimized` for that threshold."""
     cmd = make_card("Cmdr", oracle_id="cmd-oid", type_line="Legendary Creature — Elf")
     sol_ring = make_card("Sol Ring", oracle_id=SOL_RING_OID)
     filler = [make_card(f"Filler {i}", oracle_id=f"filler-{i}") for i in range(98)]
@@ -84,15 +88,194 @@ def test_game_changer_pushes_bracket_to_optimized_range() -> None:
     deck, unresolved = to_assessment_deck(resolved)
     assert not unresolved
 
-    context = AnalysisContext(ruleset=gc_ruleset(), data_version="test")
-    assessment = BracketEngine(context).analyze(deck)
+    combo_store = ComboStore(tmp_path / "combos.db")
+    try:
+        context = AnalysisContext(ruleset=gc_ruleset(), data_version="test", combo_store=combo_store)
+        assessment = BracketEngine(context).analyze(deck)
+    finally:
+        combo_store.close()
 
-    assert assessment.bracket == 4
-    assert (assessment.minimum_bracket, assessment.maximum_bracket) == (4, 5)
+    assert assessment.bracket == 3
+    assert (assessment.minimum_bracket, assessment.maximum_bracket) == (3, 4)
     assert assessment.confidence.level == "high"
     assert len(assessment.official_signals) == 1
     assert assessment.official_signals[0].category == "GAME_CHANGER"
     assert assessment.evidence and "Sol Ring" in assessment.evidence[0].card_or_cards
+
+
+def test_four_game_changers_pushes_to_optimized() -> None:
+    """>3 Game Changers → floor 4 (Optimized), matching the official rule that 4+ Game Changers
+    exceeds Bracket 3's allowance."""
+    gc_names = [("Sol Ring", "gc-0"), ("Mana Vault", "gc-1"),
+                ("Demonic Tutor", "gc-2"), ("Cyclonic Rift", "gc-3")]
+    ruleset = Ruleset({
+        "version": "test-1",
+        "brackets": {1: {"name": "Exhibition"}, 2: {"name": "Core"}, 3: {"name": "Upgraded"},
+                     4: {"name": "Optimized"}, 5: {"name": "cEDH"}},
+        "game_changers": [{"name": n, "oracle_id": oid} for n, oid in gc_names],
+    })
+    cmd = make_card("Cmdr", oracle_id="cmd-oid", type_line="Legendary Creature — Elf")
+    gc_cards = [make_card(n, oracle_id=oid) for n, oid in gc_names]
+    filler = [make_card(f"Filler {i}", oracle_id=f"filler-{i}") for i in range(95)]
+    resolved = _analysis_deck(
+        [entry(cmd, section="commander")] + [entry(c) for c in gc_cards]
+        + [entry(c) for c in filler])
+    deck, unresolved = to_assessment_deck(resolved)
+    assert not unresolved
+
+    context = AnalysisContext(ruleset=ruleset, data_version="test")
+    assessment = BracketEngine(context).analyze(deck)
+
+    assert assessment.bracket == 4
+    assert (assessment.minimum_bracket, assessment.maximum_bracket) == (4, 5)
+
+
+def test_mass_land_denial_floors_bracket_4() -> None:
+    """A symmetric, non-replacing land-destruction effect (Armageddon-style) floors Bracket 4 —
+    spec §15."""
+    cmd = make_card("Cmdr", oracle_id="cmd-oid", type_line="Legendary Creature — Elf")
+    armageddon = make_card("Armageddon", oracle_id="arma-oid", oracle_text="Destroy all lands.")
+    filler = [make_card(f"Filler {i}", oracle_id=f"filler-{i}") for i in range(98)]
+    resolved = _analysis_deck(
+        [entry(cmd, section="commander"), entry(armageddon)] + [entry(c) for c in filler])
+    deck, unresolved = to_assessment_deck(resolved)
+    assert not unresolved
+
+    context = AnalysisContext(ruleset=gc_ruleset(), data_version="test")
+    assessment = BracketEngine(context).analyze(deck)
+
+    assert assessment.minimum_bracket >= 4
+    assert any(s.category == "MASS_LAND_DENIAL" for s in assessment.official_signals)
+
+
+def test_single_land_destruction_is_not_mass_land_denial() -> None:
+    """Regression for spec §15: single-target land removal must NOT be flagged as mass land
+    denial."""
+    cmd = make_card("Cmdr", oracle_id="cmd-oid", type_line="Legendary Creature — Elf")
+    strip = make_card("Land Destroyer", oracle_id="ld-oid", oracle_text="Destroy target land.")
+    filler = [make_card(f"Filler {i}", oracle_id=f"filler-{i}") for i in range(98)]
+    resolved = _analysis_deck(
+        [entry(cmd, section="commander"), entry(strip)] + [entry(c) for c in filler])
+    deck, unresolved = to_assessment_deck(resolved)
+    assert not unresolved
+
+    context = AnalysisContext(ruleset=gc_ruleset(), data_version="test")
+    assessment = BracketEngine(context).analyze(deck)
+
+    assert not any(s.category == "MASS_LAND_DENIAL" for s in assessment.official_signals)
+
+
+def test_repeatable_extra_turn_floors_bracket_4() -> None:
+    cmd = make_card("Cmdr", oracle_id="cmd-oid", type_line="Legendary Creature — Elf")
+    engine_card = make_card(
+        "Extra Turn Engine", oracle_id="et-oid", type_line="Artifact",
+        oracle_text="Whenever you cast a spell, take an extra turn after this one.")
+    filler = [make_card(f"Filler {i}", oracle_id=f"filler-{i}") for i in range(98)]
+    resolved = _analysis_deck(
+        [entry(cmd, section="commander"), entry(engine_card)] + [entry(c) for c in filler])
+    deck, unresolved = to_assessment_deck(resolved)
+    assert not unresolved
+
+    context = AnalysisContext(ruleset=gc_ruleset(), data_version="test")
+    assessment = BracketEngine(context).analyze(deck)
+
+    assert assessment.minimum_bracket >= 4
+    assert any(s.category == "EXTRA_TURN" for s in assessment.official_signals)
+
+
+def test_single_extra_turn_floors_bracket_2() -> None:
+    cmd = make_card("Cmdr", oracle_id="cmd-oid", type_line="Legendary Creature — Elf")
+    time_warp = make_card("Time Warp", oracle_id="tw-oid", type_line="Sorcery",
+                           oracle_text="Take an extra turn after this one.")
+    filler = [make_card(f"Filler {i}", oracle_id=f"filler-{i}") for i in range(98)]
+    resolved = _analysis_deck(
+        [entry(cmd, section="commander"), entry(time_warp)] + [entry(c) for c in filler])
+    deck, unresolved = to_assessment_deck(resolved)
+    assert not unresolved
+
+    context = AnalysisContext(ruleset=gc_ruleset(), data_version="test")
+    assessment = BracketEngine(context).analyze(deck)
+
+    assert assessment.minimum_bracket == 2
+    assert assessment.maximum_bracket <= 3
+
+
+def test_two_card_combo_via_combo_store(tmp_path: Path) -> None:
+    cmd = make_card("Cmdr", oracle_id="cmd-oid", type_line="Legendary Creature — Elf")
+    piece_a = make_card("Combo Piece A", oracle_id="combo-a")
+    piece_b = make_card("Combo Piece B", oracle_id="combo-b")
+    filler = [make_card(f"Filler {i}", oracle_id=f"filler-{i}") for i in range(97)]
+    resolved = _analysis_deck(
+        [entry(cmd, section="commander"), entry(piece_a), entry(piece_b)]
+        + [entry(c) for c in filler])
+    deck, unresolved = to_assessment_deck(resolved)
+    assert not unresolved
+
+    combo = Combo(
+        id="combo-1", produces=["Infinite mana"], identity="C",
+        uses=[ComboCard(oracle_id="combo-a", name="Combo Piece A"),
+              ComboCard(oracle_id="combo-b", name="Combo Piece B")],
+        requires=[],
+    )
+    combo_store = ComboStore(tmp_path / "combos.db")
+    combo_store.add([combo])
+    try:
+        context = AnalysisContext(ruleset=gc_ruleset(), data_version="test", combo_store=combo_store)
+        assessment = BracketEngine(context).analyze(deck)
+    finally:
+        combo_store.close()
+
+    assert assessment.minimum_bracket >= 4
+    assert any(s.category == "TWO_CARD_COMBO" for s in assessment.official_signals)
+
+
+def test_missing_combo_store_notes_incomplete_data() -> None:
+    """`combo_store is None` means "unknown", not "no combos" — confidence drops to medium with an
+    explanatory reason, rather than silently reporting high confidence on incomplete data."""
+    cmd = make_card("Cmdr", oracle_id="cmd-oid", type_line="Legendary Creature — Elf")
+    filler = [make_card(f"Filler {i}", oracle_id=f"filler-{i}") for i in range(99)]
+    resolved = _analysis_deck([entry(cmd, section="commander")] + [entry(c) for c in filler])
+    deck, unresolved = to_assessment_deck(resolved)
+    assert not unresolved
+
+    context = AnalysisContext(ruleset=gc_ruleset(), data_version="test")  # combo_store=None
+    assessment = BracketEngine(context).analyze(deck)
+
+    assert assessment.confidence.level == "medium"
+    assert any("combo data" in r.lower() for r in assessment.confidence.reasons)
+
+
+def test_fast_mana_and_tutor_are_heuristic_only() -> None:
+    """Fast mana and tutors are heuristic/informational — they must not by themselves push the
+    bracket range above the unconstrained baseline (spec §18/§19)."""
+    ruleset = Ruleset({
+        "version": "test-1",
+        "brackets": {1: {"name": "Exhibition"}, 2: {"name": "Core"}, 3: {"name": "Upgraded"},
+                     4: {"name": "Optimized"}, 5: {"name": "cEDH"}},
+        "game_changers": [],
+        "fast_mana": [{"name": "Sol Ring"}, {"name": "Mana Vault"}, {"name": "Mana Crypt"}],
+    })
+    cmd = make_card("Cmdr", oracle_id="cmd-oid", type_line="Legendary Creature — Elf")
+    sol_ring = make_card("Sol Ring", oracle_id="sol-oid")
+    mana_vault = make_card("Mana Vault", oracle_id="vault-oid")
+    mana_crypt = make_card("Mana Crypt", oracle_id="crypt-oid")
+    tutor = make_card("Demonic Tutor", oracle_id="tutor-oid",
+                       oracle_text="Search your library for a card, put it into your hand.")
+    filler = [make_card(f"Filler {i}", oracle_id=f"filler-{i}") for i in range(95)]
+    resolved = _analysis_deck(
+        [entry(cmd, section="commander"), entry(sol_ring), entry(mana_vault),
+         entry(mana_crypt), entry(tutor)] + [entry(c) for c in filler])
+    deck, unresolved = to_assessment_deck(resolved)
+    assert not unresolved
+
+    context = AnalysisContext(ruleset=ruleset, data_version="test")
+    assessment = BracketEngine(context).analyze(deck)
+
+    assert not any(s.source_type == "official" for s in assessment.heuristic_signals)
+    assert any(s.category == "FAST_MANA" for s in assessment.heuristic_signals)
+    assert any(s.category == "TUTOR" for s in assessment.heuristic_signals)
+    assert assessment.minimum_bracket == 1
+    assert assessment.maximum_bracket <= 3
 
 
 def test_missing_commander_is_low_confidence_error() -> None:
@@ -141,11 +324,13 @@ def test_bracket_service_analyze_decklist_end_to_end(tmp_path: Path) -> None:
     db = CardDatabase(tmp_path / "test.db")
     db.ingest_cards(FIXTURES / "oracle_cards_sample.json")
     try:
-        service = BracketService(db=db, ruleset=gc_ruleset())
+        service = BracketService(db=db, ruleset=gc_ruleset(),
+                                  combo_db_path=tmp_path / "combos.db")
         report = service.analyze_decklist(
             (FIXTURES / "deck_manabox.txt").read_text(), name="Sample")
         assert report.assessment.schema_version == "1.0"
-        assert report.assessment.bracket in {2, 4}
+        # 1 Game Changer (Sol Ring) in a small/invalid-size deck → floor 3, ceiling 4.
+        assert report.assessment.bracket == 3
         assert report.unresolved == []
         assert "## Bracket" in report.markdown
     finally:
@@ -162,7 +347,8 @@ def test_analyze_endpoint(tmp_path: Path) -> None:
         # `db_path` (not a live `db`) so the connection opens lazily inside the request thread —
         # see BracketService's docstring on why a pre-built db can't cross threads safely here.
         client.app.state.bracket_service.close()
-        client.app.state.bracket_service = BracketService(db_path=db_path, ruleset=gc_ruleset())
+        client.app.state.bracket_service = BracketService(
+            db_path=db_path, ruleset=gc_ruleset(), combo_db_path=tmp_path / "combos.db")
 
         resp = client.post("/api/v1/analyze", json={
             "decklist": (FIXTURES / "deck_manabox.txt").read_text(),

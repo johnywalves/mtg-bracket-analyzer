@@ -173,6 +173,25 @@ game_changers:
     oracle_id: "e8863518-0bfa-49c3-8c6e-6c9116a81051"
     colors: ["G"]
 
+fast_mana:
+  # Commonly-cited EDH "fast mana" staples (name-only — no fabricated oracle_ids; see CLAUDE.md's
+  # rule to treat this kind of list as external, versioned data). Heuristic signal only — informs
+  # deck-speed estimation, never gates the bracket by itself (spec §18).
+  - name: "Sol Ring"
+  - name: "Mana Crypt"
+  - name: "Mana Vault"
+  - name: "Grim Monolith"
+  - name: "Chrome Mox"
+  - name: "Mox Diamond"
+  - name: "Mox Opal"
+  - name: "Lotus Petal"
+  - name: "Jeweled Lotus"
+  - name: "Lion's Eye Diamond"
+  - name: "Dark Ritual"
+  - name: "Culling the Weak"
+  - name: "Seething Song"
+  - name: "Ancient Tomb"
+
 signals:
   extra_turns:
     enabled: true
