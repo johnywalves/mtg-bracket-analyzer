@@ -29,7 +29,7 @@ Components), nunca do navegador:
    ```bash
    cd web
    npm install
-   cp .env.local.example .env.local   # ajuste MTG_API_URL / MTG_API_KEY se necessário
+   cp ../.env.example .env.local      # ajuste MTG_API_URL / MTG_API_KEY se necessário
    npm run dev -- -p 3001             # 3001 porque o frontend/ Vite usa 3000/5173
    ```
 3. Abra `http://localhost:3001`.
