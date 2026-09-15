@@ -17,13 +17,23 @@ const TIER_STYLES: Record<number, string> = {
   5: "border-accent-primary/50 bg-accent-primary/15 text-accent-primary",
 };
 
-export function BracketBadge({ tier, size = "sm" }: { tier: number; size?: "sm" | "lg" }) {
+export function BracketBadge({
+  tier,
+  size = "sm",
+  className = "",
+}: {
+  tier: number;
+  size?: "sm" | "lg";
+  className?: string;
+}) {
   const style = TIER_STYLES[tier] ?? TIER_STYLES[3];
   const name = TIER_NAMES[tier] ?? `Bracket ${tier}`;
 
   if (size === "lg") {
     return (
-      <div className={`inline-flex items-center gap-3 rounded-xl border px-4 py-2 ${style}`}>
+      <div
+        className={`flex items-center justify-center gap-3 rounded-xl border px-4 py-2 ${style} ${className}`}
+      >
         <span className="text-3xl font-bold leading-none">{tier}</span>
         <div className="leading-tight">
           <p className="text-xs uppercase tracking-wide opacity-80">Bracket</p>
@@ -35,7 +45,7 @@ export function BracketBadge({ tier, size = "sm" }: { tier: number; size?: "sm" 
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${style}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${style} ${className}`}
     >
       <span className="font-semibold">{tier}</span>
       {name}

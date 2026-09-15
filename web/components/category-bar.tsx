@@ -21,7 +21,7 @@ export function CategoryBar({ category, count, target, gap }: CategoryCount) {
           {gap > 0 ? ` · faltam ${gap}` : ""}
         </span>
       </div>
-      <div className="h-2 rounded-full bg-white/15">
+      <div className="h-4 rounded-full bg-white/15">
         <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
       </div>
     </div>

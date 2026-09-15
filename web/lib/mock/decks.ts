@@ -42,7 +42,7 @@ export const MOCK_DECKS: DeckReport[] = [
       { cmc: 7, count: 3 },
     ],
     game_changers: ["Demonic Tutor", "Cyclonic Rift", "Vampiric Tutor", "Sol Ring"],
-    combos: ["Infinite mana — Basalt Monolith + Rings of Brighthearth"],
+    combos: ["Infinite mana: Basalt Monolith + Rings of Brighthearth"],
     bracket_estimate: 4,
     bracket_rationale: "4 Game Changers + densidade de tutores empurram pro bracket 4 (alto poder).",
   },

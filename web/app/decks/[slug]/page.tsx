@@ -23,9 +23,13 @@ export default async function DeckReportPage({
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
-      <Link href="/decks" className="text-sm text-accent-secondary hover:underline">
-        ← Decks
-      </Link>
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted">
+        <Link href="/decks" className="text-accent-secondary hover:underline">
+          Decks
+        </Link>
+        <span className="text-muted/60">/</span>
+        <span className="text-fg/80">{report.name}</span>
+      </nav>
 
       <div className="mt-4 flex items-start justify-between gap-4">
         <div>
@@ -91,7 +95,7 @@ export default async function DeckReportPage({
               {report.game_changers.map((card) => (
                 <li
                   key={card}
-                  className="rounded-full border border-accent-primary/30 bg-accent-primary/10 px-3 py-1 text-sm text-fg/80"
+                  className="rounded-full border border-accent-primary/50 bg-accent-primary/15 px-3 py-1 text-sm font-medium text-fg"
                 >
                   {card}
                 </li>
@@ -103,10 +107,32 @@ export default async function DeckReportPage({
         {report.combos.length > 0 && (
           <Panel>
             <h2 className="text-lg font-medium text-fg">Combos</h2>
-            <ul className="mt-3 space-y-1 text-sm text-fg/80">
-              {report.combos.map((combo) => (
-                <li key={combo}>{combo}</li>
-              ))}
+            <ul className="mt-3 space-y-1.5 text-sm text-fg/80">
+              {report.combos.map((combo) => {
+                const [label, cardsPart] = combo.split(":").map((part) => part.trim());
+                const cards = cardsPart?.split("+").map((card) => card.trim()) ?? [];
+                const spellbookHref = `https://commanderspellbook.com/search/?q=${encodeURIComponent(
+                  cards.join(" "),
+                )}`;
+
+                return (
+                  <li key={combo}>
+                    <strong className="text-fg">{label}:</strong>{" "}
+                    {cardsPart ? (
+                      <a
+                        href={spellbookHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-accent-secondary hover:underline"
+                      >
+                        {cardsPart}
+                      </a>
+                    ) : (
+                      cardsPart
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </Panel>
         )}
