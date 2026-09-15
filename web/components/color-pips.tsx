@@ -1,24 +1,20 @@
-const COLOR_DOTS: Record<string, string> = {
-  W: "bg-[#f8f6d8]",
-  U: "bg-[#0e68ab]",
-  B: "bg-[#150b00]",
-  R: "bg-[#d3202a]",
-  G: "bg-[#00733e]",
-};
+const COLORS = ["W", "U", "B", "R", "G"] as const;
 
-/** Bolinhas WUBRG pra identidade de cor (ex.: "BGUW"). "C" = incolor. */
+/** Bolas WUBRG oficiais (símbolos Scryfall) pra identidade de cor (ex.: "BGUW"). "C" = incolor. */
 export function ColorPips({ identity }: { identity: string }) {
   if (identity === "C" || identity.length === 0) {
     return <span className="text-xs text-muted">incolor</span>;
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1.5">
       {identity.split("").map((color, i) => (
-        <span
+        <img
           key={`${color}-${i}`}
-          className={`h-3 w-3 rounded-full border border-white/40 ${COLOR_DOTS[color] ?? "bg-muted"}`}
+          src={`/mana/${COLORS.includes(color as (typeof COLORS)[number]) ? color : "C"}.svg`}
+          alt={color}
           title={color}
+          className="h-5 w-5 rounded-full drop-shadow-[1px_1px_0_rgba(255,255,255,0.9)]"
         />
       ))}
     </div>

@@ -9,12 +9,16 @@ const TIER_NAMES: Record<number, string> = {
   5: "cEDH",
 };
 
+// Fundo sólido + texto de contraste (não tint translúcido sobre o fundo
+// escuro) — uma cor própria por tier, subindo de "casual" (verde) a
+// "competitivo" (vermelho), em vez de reaproveitar só as duas cores de
+// destaque.
 const TIER_STYLES: Record<number, string> = {
-  1: "border-accent-secondary/50 bg-accent-secondary/15 text-accent-secondary",
-  2: "border-accent-secondary/50 bg-accent-secondary/15 text-accent-secondary",
-  3: "border-white/30 bg-white/10 text-fg",
-  4: "border-accent-primary/50 bg-accent-primary/15 text-accent-primary",
-  5: "border-accent-primary/50 bg-accent-primary/15 text-accent-primary",
+  1: "border-transparent bg-[#2fbf71] text-[#052e16]",
+  2: "border-transparent bg-accent-secondary text-[#032027]",
+  3: "border-transparent bg-[#f5c93f] text-[#3a2900]",
+  4: "border-transparent bg-[#ff8a3d] text-[#3a1600]",
+  5: "border-transparent bg-accent-primary text-white",
 };
 
 export function BracketBadge({
@@ -45,7 +49,7 @@ export function BracketBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${style} ${className}`}
+      className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold ${style} ${className}`}
     >
       <span className="font-semibold">{tier}</span>
       {name}
