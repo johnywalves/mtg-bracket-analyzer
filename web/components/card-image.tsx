@@ -80,7 +80,7 @@ export function CardImage({
  * etc.) — mesma ideia de clique-pra-ver da grade de Game Changers, só que
  * como um link inline em vez de uma figura em bloco.
  */
-export function CardNameLink({ name }: { name: string }) {
+export function CardNameLink({ name, className }: { name: string; className?: string }) {
   const [open, setOpen] = useState(false);
   const src = scryfallImageUrl(name);
 
@@ -89,7 +89,7 @@ export function CardNameLink({ name }: { name: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="cursor-zoom-in text-accent-secondary underline decoration-dotted underline-offset-2 hover:decoration-solid"
+        className={`cursor-zoom-in truncate text-left text-accent-secondary underline decoration-dotted underline-offset-2 hover:decoration-solid ${className ?? ""}`}
         aria-label={`Ver ${name} em tela cheia`}
       >
         {name}

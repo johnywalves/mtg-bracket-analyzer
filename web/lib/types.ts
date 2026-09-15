@@ -25,6 +25,21 @@ export interface CurveBucket {
   count: number;
 }
 
+/**
+ * Um card na decklist, pra a listagem final da página do deck.
+ * `type` é o tipo primário (em inglês, igual ao Scryfall `type_line` /
+ * `card_type` do backend — ex.: "Creature", "Instant", "Land") usado pra
+ * segmentar a lista; `type_line` é a linha completa, opcional, pra tooltip.
+ */
+export interface DeckCardEntry {
+  name: string;
+  type: string;
+  quantity: number;
+  mana_cost?: string | null;
+  type_line?: string | null;
+  image_url?: string | null;
+}
+
 export interface DeckReport {
   name: string | null;
   commanders: string[];
@@ -36,6 +51,7 @@ export interface DeckReport {
   combos: string[];
   bracket_estimate: number; // 1–5
   bracket_rationale: string;
+  cards: DeckCardEntry[];
 }
 
 /** Resumo usado na listagem (equivalente ao que GET /decks devolverá). */

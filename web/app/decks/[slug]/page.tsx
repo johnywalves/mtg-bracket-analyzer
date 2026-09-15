@@ -5,6 +5,7 @@ import { BracketBadge } from "@/components/bracket-badge";
 import { CategoryBar } from "@/components/category-bar";
 import { ColorPips } from "@/components/color-pips";
 import { CurveChart } from "@/components/curve-chart";
+import { DeckCardList } from "@/components/deck-card-list";
 import { Panel } from "@/components/panel";
 import { ValidationBadge } from "@/components/validation-badge";
 import { getDeckReport } from "@/lib/mock/deck-service";
@@ -136,6 +137,10 @@ export default async function DeckReportPage({
             </ul>
           </Panel>
         )}
+
+        <Panel>
+          <DeckCardList cards={report.cards} commanders={report.commanders} />
+        </Panel>
       </div>
     </main>
   );
