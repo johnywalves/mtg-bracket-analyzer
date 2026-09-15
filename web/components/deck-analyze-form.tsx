@@ -2,11 +2,8 @@
 
 import { useActionState } from "react";
 
-import {
-  analyzeDeckAction,
-  INITIAL_ANALYZE_STATE,
-  type AnalyzeFormState,
-} from "@/app/actions";
+import { analyzeDeckAction } from "@/app/actions";
+import { INITIAL_ANALYZE_STATE, type AnalyzeFormState } from "@/app/analyze-form-state";
 import { BracketBadge } from "@/components/bracket-badge";
 import { Panel } from "@/components/panel";
 import type { AnalyzeResponse, Signal } from "@/lib/types";
