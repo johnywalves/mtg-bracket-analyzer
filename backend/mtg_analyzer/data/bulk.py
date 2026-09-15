@@ -2,15 +2,24 @@
 
 Polls ``/bulk-data``, downloads the Oracle Cards and Rulings files, and re-downloads
 only when Scryfall's ``updated_at`` changes (tracked in a local manifest). Streams to
-disk so memory stays bounded regardless of file size. httpx transparently decodes the
-gzip transfer-encoding, so the on-disk files are plain JSON.
+disk so memory stays bounded regardless of file size.
+
+As of 2026, Scryfall serves bulk files as ``.jsonl.gz`` — one JSON object per line, gzip at
+the file level (not just HTTP Content-Encoding), which httpx's ``iter_bytes`` does *not*
+transparently decode. ``_stream_to_file`` therefore wraps the byte stream in
+``gzip.GzipFile`` and writes the *decompressed* JSONL to disk (no ``.gz`` suffix), which is
+what ``data/db.py``'s ``_stream_bulk_objects`` reads. The catalog now exposes this URL as
+``jsonl_download_uri`` (the older ``download_uri``/single-JSON-array layout is gone).
 
 See the ``scryfall-api`` skill for the bulk-data catalog and refresh guidance.
 """
 
 from __future__ import annotations
 
+import gzip
 import json
+import shutil
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -74,8 +83,8 @@ class BulkDataManager:
         if cached and cached.updated_at == updated_at and not force:
             return cached  # up to date
 
-        dest = self.dir / f"{bulk_type}.json"
-        self._stream_to_file(entry["download_uri"], dest)
+        dest = self.dir / f"{bulk_type}.jsonl"
+        self._stream_to_file(entry["jsonl_download_uri"], dest)
 
         manifest = self._load_manifest()
         manifest[bulk_type] = {"file": dest.name, "updated_at": updated_at}
@@ -89,6 +98,37 @@ class BulkDataManager:
             tmp.open("wb") as fh,
         ):
             resp.raise_for_status()
-            for chunk in resp.iter_bytes():  # httpx decodes gzip → plain JSON bytes
-                fh.write(chunk)
+            # Scryfall's `.jsonl.gz` bulk files are gzip at the file level (not just HTTP
+            # Content-Encoding), so httpx's iter_bytes yields the raw compressed bytes — wrap in
+            # gzip to stream out decompressed JSONL lines instead of the compressed stream.
+            with gzip.GzipFile(fileobj=_iter_bytes_as_fileobj(resp.iter_bytes())) as gz:
+                shutil.copyfileobj(gz, fh)
         tmp.replace(dest)  # atomic swap so a partial download never looks complete
+
+
+class _iter_bytes_as_fileobj:
+    """Wrap an httpx ``iter_bytes`` generator into the file-like object ``gzip.GzipFile`` needs.
+    Matches the gzip typeshed's ``_ReadableFileobj`` Protocol exactly: ``read(n)`` (GzipFile calls
+    it with -1 to mean "until EOF") plus ``seek`` — GzipFile probes seekability once at open time
+    via a zero-length forward seek, which is all this stream needs to support."""
+    def __init__(self, chunks: Iterator[bytes]) -> None:
+        self._it = iter(chunks)
+        self._buf = bytearray()
+        self._eof = False
+
+    def read(self, n: int, /) -> bytes:
+        while not self._eof and (n < 0 or len(self._buf) < n):
+            try:
+                self._buf.extend(next(self._it))
+            except StopIteration:
+                self._eof = True
+        if n < 0:
+            n = len(self._buf)
+        out = bytes(self._buf[:n])
+        del self._buf[:n]
+        return out
+
+    def seek(self, n: int, /) -> int:
+        if n != 0:
+            raise OSError("_iter_bytes_as_fileobj is a forward-only stream; only seek(0) is valid")
+        return 0

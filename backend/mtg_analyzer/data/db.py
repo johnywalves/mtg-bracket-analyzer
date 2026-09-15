@@ -8,8 +8,9 @@ Two tables, per project-plan.md:
                     From the Oracle Cards bulk this is one printing per card; swapping
                     in Default Cards later populates all printings (same schema).
 
-Plus a ``rulings`` table joined on ``oracle_id``. Ingest streams the bulk JSON with
-ijson so memory stays bounded.
+Plus a ``rulings`` table joined on ``oracle_id``. Ingest reads Scryfall's bulk files in a
+streaming, memory-bounded way; both the current JSONL layout (one object per line) and the
+legacy single-JSON-array layout are supported — see ``_stream_bulk_objects``.
 """
 
 from __future__ import annotations
@@ -152,20 +153,55 @@ class CardDatabase:
                 printings,
             )
 
+    def upsert_card(self, card: Card) -> None:
+        """Insert/replace a single card fetched live (e.g. from a Scryfall resolution fallback).
+
+        Builds the same `cards`/`printings` row shape as `ingest_cards`, so a live-fetched card
+        self-heals the local DB and resolves offline on the next run — see
+        docs/spec/bracket-engine.md's requirement that cached results stay deterministic regardless
+        of network availability.
+        """
+        oracle_key = card.oracle_id or card.id
+        ci_key = "".join(sorted(card.color_identity))
+        card_row = (
+            oracle_key,
+            card.name,
+            card.name.split(" // ")[0],
+            card.cmc,
+            ci_key,
+            card.type_line,
+            int(card.is_commander_legal()),
+            int(card.game_changer),
+            card.layout,
+            int(card.layout not in NON_GAMEPLAY_LAYOUTS),
+            card.model_dump_json(),
+        )
+        printing_row = (
+            card.id,
+            oracle_key,
+            card.set,
+            card.collector_number,
+            card.rarity,
+            card.usd_price(),
+            card.get_image("normal"),
+        )
+        cur = self.conn.cursor()
+        self._flush(cur, [card_row], [printing_row])
+        self.conn.commit()
+
     def ingest_rulings(self, bulk_path: Path) -> int:
         """Stream a Rulings bulk file into the rulings table (replaces existing)."""
         cur = self.conn.cursor()
         cur.execute("DELETE FROM rulings")
         rows: list[tuple] = []
         count = 0
-        with bulk_path.open("rb") as fh:
-            for r in ijson.items(fh, "item"):
-                rows.append((r.get("oracle_id"), r.get("source"), r.get("published_at"),
-                             r.get("comment")))
-                count += 1
-                if len(rows) >= _BATCH:
-                    cur.executemany("INSERT INTO rulings VALUES (?,?,?,?)", rows)
-                    rows = []
+        for r in _stream_bulk_objects(bulk_path):
+            rows.append((r.get("oracle_id"), r.get("source"), r.get("published_at"),
+                         r.get("comment")))
+            count += 1
+            if len(rows) >= _BATCH:
+                cur.executemany("INSERT INTO rulings VALUES (?,?,?,?)", rows)
+                rows = []
         if rows:
             cur.executemany("INSERT INTO rulings VALUES (?,?,?,?)", rows)
         self.conn.commit()
@@ -245,6 +281,31 @@ class CardDatabase:
 
 
 def _stream_cards(bulk_path: Path) -> Iterator[Card]:
+    for obj in _stream_bulk_objects(bulk_path):
+        yield Card.model_validate(obj)
+
+
+def _stream_bulk_objects(bulk_path: Path) -> Iterator[dict]:
+    """Yield one dict per card/ruling from a Scryfall bulk file.
+
+    Supports both formats Scryfall has served:
+      * the current ``.jsonl.gz`` layout — one JSON object per line (gzip-decompressed by
+        :class:`BulkDataManager` on download, so by the time this sees it it's plain JSONL);
+      * the legacy layout — a single top-level JSON array (what older caches / test fixtures
+        still hold).
+
+    The format is detected from the first non-whitespace byte, so the on-disk filename suffix
+    doesn't matter.
+    """
     with bulk_path.open("rb") as fh:
-        for obj in ijson.items(fh, "item"):
-            yield Card.model_validate(obj)
+        head = fh.read(1)
+        while head in (b" ", b"\t", b"\r", b"\n"):
+            head = fh.read(1)
+        fh.seek(0)
+        if head == b"[":  # legacy: top-level JSON array
+            yield from ijson.items(fh, "item")
+        else:  # current: JSONL, one object per line
+            for line in fh:
+                line = line.strip()
+                if line:
+                    yield json.loads(line)

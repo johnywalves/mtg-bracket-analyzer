@@ -2,7 +2,6 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-
 from mtg_analyzer.data.db import CardDatabase
 from mtg_analyzer.models.card import Card
 
@@ -91,6 +90,25 @@ def test_rulings_join(db: CardDatabase) -> None:
 def test_reingest_is_idempotent(db: CardDatabase) -> None:
     db.ingest_cards(FIXTURES / "oracle_cards_sample.json")  # second time
     assert db.card_count() == 4  # INSERT OR REPLACE, not duplicated
+
+
+def test_ingest_reads_jsonl_format(tmp_path: Path) -> None:
+    """The current Scryfall bulk layout is JSONL (one object per line), not a single JSON
+    array — ingest must read it (see `_stream_bulk_objects`)."""
+    jsonl = tmp_path / "oracle_cards.jsonl"
+    jsonl.write_text(
+        '{"id": "x", "oracle_id": "oid-x", "name": "Giant Growth", "layout": "normal",'
+        ' "cmc": 1.0, "color_identity": ["G"], "legalities": {"commander": "legal"}}\n'
+        '{"id": "y", "oracle_id": "oid-y", "name": "Lightning Bolt", "layout": "normal",'
+        ' "cmc": 1.0, "color_identity": ["R"], "legalities": {"commander": "legal"}}\n'
+    )
+    db = CardDatabase(tmp_path / "test.db")
+    try:
+        assert db.ingest_cards(jsonl) == 2
+        assert db.get_by_name("Giant Growth") is not None
+        assert db.get_by_name("Lightning Bolt") is not None
+    finally:
+        db.close()
 
 
 def test_model_multiface_layout_without_faces() -> None:

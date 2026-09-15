@@ -94,7 +94,12 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Update inline as work com
 
 ### Phase 1 — Card data layer  `[x]`
 - [x] `data/bulk.py`: `/bulk-data` poller → stream-download **Oracle Cards** + **Rulings**, manifest
-      tracks `updated_at`, re-downloads only when it changes. (httpx decodes gzip → plain JSON on disk.)
+      tracks `updated_at`, re-downloads only when it changes. **(2026 update: Scryfall now serves
+      bulk files as `.jsonl.gz` via `jsonl_download_uri` — one JSON object per line, gzip at the
+      file level, not HTTP Content-Encoding. The old `download_uri`/single-JSON-array catalog field
+      is gone. `bulk.py` decompresses with `gzip.GzipFile` wrapping a small httpx-stream adapter;
+      `db.py`'s `_stream_bulk_objects` detects JSONL vs. the legacy array format from the first
+      byte, so old cached files / test fixtures still ingest.)**
 - [x] `data/db.py`: streaming ijson ingest into SQLite. `cards` keyed on `oracle_id` (+ `printings`
       keyed on `id` for price/set/image, + `rulings`). Indexes on name, front_name, ci_key, cmc,
       commander legality. Non-gameplay layouts (art series/tokens/emblems) flagged + deprioritized.
@@ -826,3 +831,22 @@ Four-stage funnel (full detail in the **`mtg-data-ecosystem`** skill):
   threadpool doesn't guarantee the same thread across calls). 8 new tests; **160 tests, ruff + mypy
   clean.** Scope was plumbing + the existing Game Changer/validation signals only — deepening the
   heuristic signal set (fast mana, tutors, combos, speed) is a later change.
+- **2026-09-15** — **Live Scryfall backfill for unresolved decklist cards + Scryfall bulk-data
+  format fix.** Root cause of a session's "83 cards unresolved" report: a fresh checkout with no
+  `data/app.db` yet (never ran `mtg data refresh`) — while fixing that, found Scryfall's bulk-data
+  catalog had changed shape (`download_uri` → `jsonl_download_uri`, single JSON array →
+  `.jsonl.gz`); see the Phase 1 note above and `data/bulk.py`'s module docstring for the fix.
+  Separately, added the standing improvement the user asked for: `BracketService._live_fill_unresolved`
+  now batch-fetches any name still unresolved after the offline lookup from live Scryfall
+  (`ScryfallClient.collection`), **upserts hits into the local DB** (`CardDatabase.upsert_card`, new)
+  so the next run resolves offline too, and fills them onto the matching `ResolvedEntry`s — best-
+  effort/never-raises, so total network unavailability degrades to today's behavior. Keeps
+  `BracketEngine.analyze` itself offline-only per docs/spec/bracket-engine.md §80; only the
+  resolution step (before the engine runs) touches the network, and persisting what it fetches
+  satisfies §3.5's "network availability MUST NOT change the result after data has been resolved and
+  cached." 4 new tests (`tests/test_bracket_service.py`) + 1 new format-regression test
+  (`test_ingest_reads_jsonl_format`); **169 tests, ruff + mypy clean.** Also hit and fixed an
+  environment issue worth knowing about elsewhere: this machine's system Python was 3.10 (project
+  requires `>=3.11`) with no newer interpreter available — resolved via `uv` (`uv python install
+  3.12 && uv venv --python 3.12 .venv`); see the updated **Dev setup** in
+  [CONTRIBUTING.md](CONTRIBUTING.md).

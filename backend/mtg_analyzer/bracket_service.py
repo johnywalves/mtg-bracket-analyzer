@@ -10,6 +10,7 @@ duplicating them — only the bracket-specific pieces (adapter, engine, ruleset,
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
@@ -23,9 +24,11 @@ from mtg_analyzer.analysis.engine import (
     load_latest_ruleset,
 )
 from mtg_analyzer.data.db import CardDatabase
+from mtg_analyzer.data.scryfall_client import ScryfallClient
 from mtg_analyzer.ingest.decklist import parse_deck
 from mtg_analyzer.ingest.resolve import resolve_deck
 from mtg_analyzer.models.assessment import BracketAssessment
+from mtg_analyzer.models.card import Card
 from mtg_analyzer.models.deck import ResolvedDeck
 
 
@@ -56,6 +59,48 @@ class BracketService:
         self._ruleset = ruleset
         self.notes: list[str] = []
 
+    def _live_fill_unresolved(self, db: CardDatabase, resolved: ResolvedDeck) -> None:
+        """Best-effort: batch-fetch entries that missed the offline lookup from live Scryfall
+        (`/cards/collection`, name-keyed — matches `resolve_card`'s own priority), upsert hits into
+        `db` so the next run resolves offline too, and fill them onto the matching entries in place.
+
+        Never raises — network absence/failure just leaves entries unresolved, same as before this
+        step existed (the engine itself stays offline-only; only resolution touches the network).
+        """
+        unresolved = [e for e in resolved.entries if not e.resolved]
+        if not unresolved:
+            return
+
+        async def run() -> tuple[list[Card], list[dict]]:
+            async with ScryfallClient() as client:
+                return await client.collection(
+                    [{"name": e.requested_name} for e in unresolved]
+                )
+
+        try:
+            found, _not_found = asyncio.run(run())
+        except Exception as exc:  # noqa: BLE001 — network is best-effort; offline path still works
+            self.notes.append(
+                f"Live Scryfall backfill unavailable — {type(exc).__name__} "
+                "(offline or rate-limited); skipped.")
+            return
+
+        by_name = {c.name.lower(): c for c in found}
+        by_front = {c.name.split(" // ")[0].lower(): c for c in found}
+        filled = 0
+        for entry in unresolved:
+            key = entry.requested_name.lower()
+            card = by_name.get(key) or by_front.get(key)
+            if card is None:
+                continue
+            db.upsert_card(card)
+            entry.card = card
+            filled += 1
+
+        if filled:
+            self.notes.append(
+                f"Filled {filled} card(s) live from Scryfall (not yet in the local bulk snapshot).")
+
     def _open_db(self) -> CardDatabase:
         """A connection scoped to the current call/thread — see `__init__`'s note on why a shared,
         cached connection isn't safe across FastAPI's threadpool."""
@@ -80,12 +125,14 @@ class BracketService:
 
     def analyze_decklist(self, decklist_text: str, *, name: str | None = None) -> BracketReport:
         """Decklist text → `BracketAssessment` + Markdown report. Parse → resolve (offline, against
-        the local card DB) → adapt to the engine's own `Deck` model → `BracketEngine.analyze` →
-        render. Unresolved cards are reported, never silently dropped."""
+        the local card DB) → live-fill any remaining gaps from Scryfall → adapt to the engine's own
+        `Deck` model → `BracketEngine.analyze` → render. Unresolved cards are reported, never
+        silently dropped."""
         parsed = parse_deck(decklist_text)
         db = self._open_db()
         try:
             resolved = resolve_deck(db, parsed)
+            self._live_fill_unresolved(db, resolved)
         finally:
             if self._db is None:  # only close connections this call opened itself
                 db.close()

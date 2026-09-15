@@ -13,6 +13,8 @@ htmlcov/
 # Local data (large, regenerable — never commit)
 data/scryfall/*.json
 data/scryfall/*.json.gz
+data/scryfall/*.jsonl
+data/scryfall/*.jsonl.gz
 data/rules/*.txt
 data/decks/
 data/guides/

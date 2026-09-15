@@ -25,10 +25,27 @@ bug or add a feature and send it upstream, here's how.
 
 ## Dev setup
 
+Requires **Python 3.11+** (`pyproject.toml`'s `requires-python`). If your system Python is older
+(e.g. Ubuntu 22.04 ships 3.10 with no newer interpreter available), install
+[uv](https://docs.astral.sh/uv/) and let it manage the interpreter instead of fighting apt/pyenv:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv python install 3.12
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python -e ".[dev]"
+```
+
+Otherwise the plain path works fine:
+
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
 ```
+
+If `pip install` spins for a long time re-downloading many versions of the same large wheel
+(scipy, ruff, …), your `pip` is too old to use PEP 658 metadata and is backtracking blindly —
+`pip install -U pip` first, then retry.
 
 Card data lives in `data/` and is regenerable — never commit it (`mtg data refresh` rebuilds it).
 
