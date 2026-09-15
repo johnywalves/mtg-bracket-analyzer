@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://bracket.tcgrp.com.br/sitemap.xml

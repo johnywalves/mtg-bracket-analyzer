@@ -1,0 +1,13 @@
+# Meus Brackets: Analista de Bracket da TCGRP
+
+Ferramenta local e web para análise de decks de Magic: The Gathering Commander (EDH).
+
+## Funcionalidades
+- Validação e pontuação de decks EDH usando o sistema de bracket.
+- Identificação do nível de poder do deck.
+- Sugestões de ajustes e identificação de combos.
+
+## Técnico
+- Frontend: Next.js (React), Tailwind CSS
+- Backend: Python (FastAPI), SQLite
+- Regras baseadas no comitê de Commander e Scryfall.
