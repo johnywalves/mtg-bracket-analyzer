@@ -228,12 +228,12 @@ export default function ComoFuncionaPage() {
                 ) : (
                   <ColorPips identity={key} />
                 )}
-                <span className="text-sm text-muted">
-                  {key !== "multi" && key !== "C"
-                    ? `— ${COLOR_GROUP_LABELS[key]}`
-                    : null}{" "}
-                  ({cards.length})
-                </span>
+                {key !== "multi" && key !== "C" ? (
+                  <span className="text-sm font-medium text-fg">
+                    {COLOR_GROUP_LABELS[key]}
+                  </span>
+                ) : null}
+                <span className="text-sm text-muted">({cards.length})</span>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
                 {cards.map(({ name, identity }) => (
