@@ -3,8 +3,8 @@ version: '3.8'
 services:
   web_bracket:
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: web/Dockerfile
     expose:
       - "3000"
     restart: unless-stopped
