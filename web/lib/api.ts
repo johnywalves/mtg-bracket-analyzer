@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { AnalyzeResponse } from "@/lib/types";
+
 /**
  * Client server-only para a API FastAPI do MTG Analyzer.
  *
@@ -58,4 +60,13 @@ export interface HealthStatus {
 
 export function getHealth(): Promise<HealthStatus> {
   return mtgFetch<HealthStatus>("/health");
+}
+
+/** POST /api/v1/analyze — decklist colada → BracketAssessment + relatório Markdown. */
+export function analyzeDeck(decklist: string, name?: string): Promise<AnalyzeResponse> {
+  return mtgFetch<AnalyzeResponse>("/api/v1/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decklist, name: name ?? null }),
+  });
 }

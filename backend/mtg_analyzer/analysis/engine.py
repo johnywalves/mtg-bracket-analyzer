@@ -1,8 +1,10 @@
-import yaml
+import yaml  # type: ignore[import-untyped]  # pyyaml stubs not declared in pyproject (upstream-owned)
 from pathlib import Path
 from mtg_analyzer.models.assessment import (
     Deck, BracketAssessment, Signal, Evidence, EvidenceSource, Confidence, AssessmentWarning
 )
+
+DEFAULT_RULES_DIR = Path(__file__).resolve().parent.parent / "rules" / "commander"
 
 class Ruleset:
     def __init__(self, data: dict):
@@ -25,6 +27,17 @@ class Ruleset:
         with open(filepath, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
         return cls(data)
+
+
+def load_latest_ruleset(rules_dir: Path | None = None) -> Ruleset:
+    """Load the most recent versioned ruleset (filenames are `YYYY-MM.yaml`, so lexicographic
+    order is chronological order). Rules are data, never hard-coded — see docs/spec/bracket-engine.md
+    §10 and CLAUDE.md's "treat the Game Changers list as external, versioned data" rule."""
+    directory = rules_dir or DEFAULT_RULES_DIR
+    files = sorted(directory.glob("*.yaml"))
+    if not files:
+        raise FileNotFoundError(f"No ruleset files found in {directory}")
+    return Ruleset.load(files[-1])
 
 class AnalysisContext:
     def __init__(self, ruleset: Ruleset, data_version: str, engine_version: str = "0.1.0"):

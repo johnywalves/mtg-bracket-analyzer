@@ -30,7 +30,7 @@ GAME_CHANGERS = [
 ]
 
 HEADERS = {
-    "User-Agent": "MTGAnalyzer/0.1 (jacob@quackquacklabs.com)",
+    "User-Agent": "MeusBrackets/0.1 (fale@tcgrp.com.br)",
     "Accept": "application/json",
     "Content-Type": "application/json",
 }
@@ -60,8 +60,10 @@ def main():
     print("# Game Changers with oracle_ids")
     print("game_changers:")
     for card in sorted(results, key=lambda c: c["name"]):
+        colors = ", ".join(f'"{c}"' for c in card.get("color_identity", []))
         print(f'  - name: "{card["name"]}"')
         print(f'    oracle_id: "{card["oracle_id"]}"')
+        print(f'    colors: [{colors}]')
 
     if not_found:
         print("\n# NOT FOUND:")

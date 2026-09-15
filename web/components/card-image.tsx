@@ -10,7 +10,15 @@ function scryfallImageUrl(name: string): string {
 }
 
 /** Modal de tela cheia compartilhado por CardImage e CardNameLink. */
-function CardPreviewDialog({ name, src, onClose }: { name: string; src: string; onClose: () => void }) {
+function CardPreviewDialog({
+  name,
+  src,
+  onClose,
+}: {
+  name: string;
+  src: string;
+  onClose: () => void;
+}) {
   return (
     <div
       role="dialog"
@@ -20,12 +28,22 @@ function CardPreviewDialog({ name, src, onClose }: { name: string; src: string; 
       className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/90 p-6"
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- mesmo hotlink, tamanho maior */}
-      <img src={src} alt={name} className="max-h-full max-w-full rounded-xl" />
+      <img
+        src={src}
+        alt={name}
+        className="max-h-full rounded-3xl overflow-hidden max-w-full"
+      />
     </div>
   );
 }
 
-export function CardImage({ name, className }: { name: string; className?: string }) {
+export function CardImage({
+  name,
+  className,
+}: {
+  name: string;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const src = scryfallImageUrl(name);
 
@@ -42,11 +60,17 @@ export function CardImage({ name, className }: { name: string; className?: strin
           src={src}
           alt={name}
           loading="lazy"
-          className={`aspect-[5/7] w-full rounded-lg border border-white/15 object-cover ${className ?? ""}`}
+          className={`aspect-5/7 w-full rounded-xl overflow-hidden object-cover ${className ?? ""}`}
         />
       </button>
 
-      {open ? <CardPreviewDialog name={name} src={src} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <CardPreviewDialog
+          name={name}
+          src={src}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
@@ -71,7 +95,13 @@ export function CardNameLink({ name }: { name: string }) {
         {name}
       </button>
 
-      {open ? <CardPreviewDialog name={name} src={src} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <CardPreviewDialog
+          name={name}
+          src={src}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
     </>
   );
 }

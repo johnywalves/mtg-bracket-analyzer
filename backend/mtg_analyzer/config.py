@@ -23,7 +23,7 @@ COMMANDER_SPELLBOOK_BASE = "https://backend.commanderspellbook.com"
 
 # Required by Scryfall: a descriptive User-Agent and an explicit Accept header.
 # (Requests without them are rejected — see the scryfall-api skill.)
-USER_AGENT = f"MTGAnalyzer/{__version__} (jacob@quackquacklabs.com)"
+USER_AGENT = f"MeusBrackets/{__version__} (fale@tcgrp.com.br)"
 DEFAULT_HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json"}
 
 # Politeness: Scryfall asks for <10 req/s; ~100 ms between requests is the safe value.

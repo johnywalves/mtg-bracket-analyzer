@@ -34,7 +34,7 @@ async def test_named_sends_required_headers() -> None:
     async with make_client(handler) as client:
         card = await client.named(exact="Sol Ring")
     assert card is not None and card.name == "Sol Ring"
-    assert seen["user-agent"].startswith("MTGAnalyzer/")
+    assert seen["user-agent"].startswith("MeusBrackets/")
     assert seen["accept"] == "application/json"
 
 

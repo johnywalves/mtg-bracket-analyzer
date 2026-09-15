@@ -11,7 +11,7 @@ const RULES_DIR = path.join(process.cwd(), "..", "backend", "mtg_analyzer", "rul
 interface RulesFile {
   version: string;
   brackets: Record<string, { name: string }>;
-  game_changers: { name: string; oracle_id: string }[];
+  game_changers: { name: string; oracle_id: string; colors: string[] }[];
   signals: Record<string, { enabled: boolean }>;
 }
 
@@ -32,6 +32,14 @@ function loadRules(): RulesFile {
 
 export function getGameChangerNames(): string[] {
   return loadRules().game_changers.map((card) => card.name);
+}
+
+/** Nome + identidade de cor (WUBRG, ordenado), pra segmentar a listagem por cor. */
+export function getGameChangersWithColors(): { name: string; colors: string[] }[] {
+  return loadRules().game_changers.map((card) => ({
+    name: card.name,
+    colors: card.colors,
+  }));
 }
 
 export function getRulesVersion(): string {

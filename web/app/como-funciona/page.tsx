@@ -2,12 +2,52 @@ import { Fragment } from "react";
 
 import { BracketBadge } from "@/components/bracket-badge";
 import { CardImage, CardNameLink } from "@/components/card-image";
+import { ColorPips } from "@/components/color-pips";
 import { Panel } from "@/components/panel";
 import {
   getGameChangerNames,
+  getGameChangersWithColors,
   getRulesVersion,
   getSignalKeys,
 } from "@/lib/rules/game-changers";
+
+const WUBRG = ["W", "U", "B", "R", "G"] as const;
+
+const COLOR_GROUP_LABELS: Record<string, string> = {
+  W: "Branco",
+  U: "Azul",
+  B: "Preto",
+  R: "Vermelho",
+  G: "Verde",
+  multi: "Multicolor",
+  C: "Incolor",
+};
+
+/**
+ * Agrupa Game Changers por identidade de cor: mono primeiro (ordem WUBRG),
+ * depois multicolor, depois incolor. Cada carta multicolor guarda sua própria
+ * identidade completa (ex.: "WU") pra render individual do ColorPips.
+ */
+function groupByColor(
+  cards: { name: string; colors: string[] }[],
+): { key: string; cards: { name: string; identity: string }[] }[] {
+  const groups = new Map<string, { name: string; identity: string }[]>();
+
+  for (const { name, colors } of cards) {
+    const key =
+      colors.length === 0 ? "C" : colors.length === 1 ? colors[0] : "multi";
+    const identity = colors.length === 0 ? "C" : colors.join("");
+    groups.set(key, [...(groups.get(key) ?? []), { name, identity }]);
+  }
+
+  const order = [...WUBRG, "multi", "C"];
+  return order
+    .filter((key) => groups.has(key))
+    .map((key) => ({
+      key,
+      cards: groups.get(key)!.sort((a, b) => a.name.localeCompare(b.name)),
+    }));
+}
 
 const TIERS: { tier: number; description: string }[] = [
   {
@@ -68,6 +108,34 @@ const SIGNAL_DESCRIPTIONS: Record<
   },
 };
 
+const SOURCES: { label: string; href: string; note: string }[] = [
+  {
+    label: "Introducing Commander Brackets (Beta)",
+    href: "https://magic.wizards.com/en/news/announcements/introducing-commander-brackets-beta",
+    note: "Anúncio oficial da Wizards of the Coast do sistema de 5 brackets e da lista de Game Changers.",
+  },
+  {
+    label: "Commander Brackets Beta Update",
+    href: "https://magic.wizards.com/en/news/announcements/commander-brackets-beta-update-february-9-2026",
+    note: "Atualizações periódicas da Wizards sobre a lista de Game Changers e as regras de bracket.",
+  },
+  {
+    label: "Regras oficiais do formato Commander",
+    href: "https://mtgcommander.net/index.php/rules/",
+    note: "100 cartas, singleton, identidade de cor, vida inicial e demais regras do formato.",
+  },
+  {
+    label: "Scryfall",
+    href: "https://scryfall.com",
+    note: "Dados e imagens de carta, usados via Fan Content Policy da Wizards.",
+  },
+  {
+    label: "Commander Spellbook",
+    href: "https://commanderspellbook.com",
+    note: "Base de combos usada pra detectar peças de combo prontas no deck.",
+  },
+];
+
 /** Lista de nomes de carta em prosa, cada um clicável (mesmo padrão dos Game Changers). */
 function CardNameList({ names }: { names: string[] }) {
   return (
@@ -84,11 +152,12 @@ function CardNameList({ names }: { names: string[] }) {
 
 export default function ComoFuncionaPage() {
   const gameChangers = getGameChangerNames();
+  const gameChangersByColor = groupByColor(getGameChangersWithColors());
   const rulesVersion = getRulesVersion();
   const signals = getSignalKeys();
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16">
+    <main className="mx-auto max-w-5xl px-6 py-16">
       <h1 className="text-3xl font-semibold text-fg">
         Como calculamos o Bracket
       </h1>
@@ -148,14 +217,40 @@ export default function ComoFuncionaPage() {
           ver a arte em tela cheia.
         </p>
 
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {gameChangers.map((name) => (
-            <figure key={name}>
-              <CardImage name={name} />
-              <figcaption className="mt-1.5 text-xs text-muted">
-                {name}
-              </figcaption>
-            </figure>
+        <div className="mt-6 space-y-8">
+          {gameChangersByColor.map(({ key, cards }) => (
+            <div key={key}>
+              <div className="flex items-center gap-2">
+                {key === "multi" || key === "C" ? (
+                  <span className="text-sm font-medium text-fg">
+                    {COLOR_GROUP_LABELS[key]}
+                  </span>
+                ) : (
+                  <ColorPips identity={key} />
+                )}
+                <span className="text-sm text-muted">
+                  {key !== "multi" && key !== "C"
+                    ? `— ${COLOR_GROUP_LABELS[key]}`
+                    : null}{" "}
+                  ({cards.length})
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                {cards.map(({ name, identity }) => (
+                  <figure key={name}>
+                    <CardImage name={name} />
+                    <figcaption className="mt-1.5 text-xs text-muted">
+                      {name}
+                      {key === "multi" ? (
+                        <span className="mt-1 block">
+                          <ColorPips identity={identity} />
+                        </span>
+                      ) : null}
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </section>
@@ -195,18 +290,28 @@ export default function ComoFuncionaPage() {
         </div>
       </section>
 
-      <p className="mt-12 text-xs text-muted">
-        Imagens e dados de cartas © Wizards of the Coast, via{" "}
-        <a
-          href="https://scryfall.com"
-          target="_blank"
-          rel="noreferrer"
-          className="text-accent-secondary hover:underline"
-        >
-          Scryfall
-        </a>
-        . Fan content não oficial, sem afiliação com a Wizards of the Coast.
-      </p>
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold text-fg">Fontes</h2>
+        <p className="mt-3 text-justify text-muted">
+          As informações desta página vêm das seguintes fontes oficiais e de
+          terceiros:
+        </p>
+        <ul className="mt-4 space-y-3">
+          {SOURCES.map(({ label, href, note }) => (
+            <li key={href} className="text-sm">
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent-secondary hover:underline"
+              >
+                {label}
+              </a>
+              <span className="block text-muted">{note}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
     </main>
   );
 }
