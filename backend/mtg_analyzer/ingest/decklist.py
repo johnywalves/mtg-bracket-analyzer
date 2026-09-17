@@ -38,6 +38,7 @@ def parse_decklist(text: str) -> ParsedDeck:
     entries: list[DeckEntry] = []
     section = "main"
     saw_category = saw_foil = saw_set = False
+    saw_explicit_commander = False
 
     for raw in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
         line = raw.strip()
@@ -53,11 +54,15 @@ def parse_decklist(text: str) -> ParsedDeck:
             marker = line.lstrip("/#").strip().rstrip(":").lower()
             if marker in _HEADER_TO_SECTION:
                 section = _HEADER_TO_SECTION[marker]
+                if section == "commander":
+                    saw_explicit_commander = True
             continue
 
         header = line.rstrip(":").lower()
         if header in _HEADER_TO_SECTION:
             section = _HEADER_TO_SECTION[header]
+            if section == "commander":
+                saw_explicit_commander = True
             continue
         if header in _IGNORE_HEADERS:
             continue
@@ -95,6 +100,7 @@ def parse_decklist(text: str) -> ParsedDeck:
             entry_section = "sideboard"
         elif category and "commander" in category.lower():
             entry_section = "commander"
+            saw_explicit_commander = True
 
         entries.append(DeckEntry(quantity=quantity, name=name, set_code=set_code,
                                  collector_number=collector, section=entry_section,
@@ -106,7 +112,20 @@ def parse_decklist(text: str) -> ParsedDeck:
         else "arena" if saw_set
         else "plain"
     )
-    return ParsedDeck(entries=entries, source_format=source)
+
+    if not saw_explicit_commander:
+        # No commander marker anywhere in the source — fall back to the first
+        # mainboard entry as the commander (common for plain/unmarked lists where
+        # the commander is conventionally listed first). Legality is still checked
+        # downstream (engine.py MISSING_COMMANDER / _is_legal_commander), so a
+        # genuinely illegal "first card" still surfaces as a real validation issue.
+        for entry in entries:
+            if entry.section == "main":
+                entry.section = "commander"
+                break
+
+    return ParsedDeck(entries=entries, source_format=source,
+                       explicit_commander=saw_explicit_commander)
 
 
 # --- Archidekt CSV deck export --------------------------------------------
@@ -138,6 +157,7 @@ def looks_like_archidekt_csv(text: str) -> bool:
 
 def parse_archidekt_csv(text: str) -> ParsedDeck:
     entries: list[DeckEntry] = []
+    saw_explicit_commander = False
     for row in csv.reader(io.StringIO(text.lstrip("﻿"))):
         if len(row) < _ARCHIDEKT_MIN_COLS or not row[_COL["qty"]].strip().isdigit():
             continue
@@ -145,6 +165,7 @@ def parse_archidekt_csv(text: str) -> ParsedDeck:
         sec_hint = row[_COL["section"]].strip().lower() if len(row) > _COL["section"] else ""
         if category and category.lower() == "commander":
             section = "commander"
+            saw_explicit_commander = True
         elif sec_hint in {"maybeboard", "sideboard"}:
             section = sec_hint
         else:
@@ -157,7 +178,17 @@ def parse_archidekt_csv(text: str) -> ParsedDeck:
             section=section,
             category=category,
         ))
-    return ParsedDeck(entries=entries, source_format="archidekt-csv")
+
+    if not saw_explicit_commander:
+        # Rows are positional/ordered — same first-mainboard-entry fallback as
+        # parse_decklist when no row was tagged Commander.
+        for entry in entries:
+            if entry.section == "main":
+                entry.section = "commander"
+                break
+
+    return ParsedDeck(entries=entries, source_format="archidekt-csv",
+                       explicit_commander=saw_explicit_commander)
 
 
 def parse_deck(text: str) -> ParsedDeck:

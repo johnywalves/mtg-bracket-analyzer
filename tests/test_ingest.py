@@ -1,3 +1,4 @@
+import csv
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -6,7 +7,9 @@ import pytest
 from mtg_analyzer.data.db import CardDatabase
 from mtg_analyzer.data.inventory_store import InventoryStore
 from mtg_analyzer.ingest.decklist import (
+    _COL,
     looks_like_archidekt_csv,
+    parse_archidekt_csv,
     parse_deck,
     parse_decklist,
 )
@@ -80,6 +83,69 @@ def test_parse_deck_routes_text_format() -> None:
     assert deck.source_format != "archidekt-csv"  # routed to the text parser
 
 
+def test_parse_decklist_no_marker_falls_back_to_first_card() -> None:
+    # No section header, "// COMMANDER" comment, or [Commander] tag anywhere —
+    # the first mainboard entry should be promoted to commander.
+    text = "1 Atraxa, Praetors' Voice\n1 Sol Ring\n1 Command Tower\n"
+    deck = parse_decklist(text)
+    assert deck.explicit_commander is False
+    sections = {e.name: e.section for e in deck.entries}
+    assert sections["Atraxa, Praetors' Voice"] == "commander"
+    assert sections["Sol Ring"] == "main"
+    assert sections["Command Tower"] == "main"
+
+
+def test_parse_decklist_no_marker_fallback_skips_sideboard_first_line() -> None:
+    text = "SB: 1 Totally Fake Card\n1 Atraxa, Praetors' Voice\n1 Sol Ring\n"
+    deck = parse_decklist(text)
+    assert deck.explicit_commander is False
+    sections = {e.name: e.section for e in deck.entries}
+    assert sections["Totally Fake Card"] == "sideboard"
+    assert sections["Atraxa, Praetors' Voice"] == "commander"  # first true mainboard entry
+    assert sections["Sol Ring"] == "main"
+
+
+def test_parse_decklist_explicit_marker_not_overridden() -> None:
+    # Existing marker-based fixtures must keep flagging explicit_commander=True and
+    # must not have the fallback touch anything else.
+    deck = parse_decklist((FIXTURES / "deck_manabox.txt").read_text())
+    assert deck.explicit_commander is True
+    sections = {e.name: e.section for e in deck.entries}
+    assert sections["Llanowar Elves"] == "commander"
+    assert sections["Sol Ring"] == "main"
+
+
+def test_parse_decklist_empty_has_no_commander() -> None:
+    deck = parse_decklist("")
+    assert deck.entries == []
+    assert deck.explicit_commander is False
+
+
+def test_parse_archidekt_csv_no_commander_row_falls_back_to_first() -> None:
+    # Same fixture but with the Commander category stripped from Llanowar Elves' row.
+    text = (FIXTURES / "deck_archidekt.csv").read_text()
+    lines = text.splitlines()
+    header_idx = next(i for i, line in enumerate(lines) if "Llanowar Elves" in line)
+    row = next(csv.reader([lines[header_idx]]))
+    row[_COL["category"]] = ""
+    lines[header_idx] = ",".join(row)
+    patched = "\n".join(lines) + "\n"
+
+    deck = parse_archidekt_csv(patched)
+    assert deck.explicit_commander is False
+    by_name = {e.name: e for e in deck.entries}
+    assert by_name["Llanowar Elves"].section == "commander"  # first mainboard row
+
+
+def test_parse_archidekt_csv_explicit_commander_not_overridden() -> None:
+    text = (FIXTURES / "deck_archidekt.csv").read_text()
+    deck = parse_archidekt_csv(text)
+    assert deck.explicit_commander is True
+    by_name = {e.name: e for e in deck.entries}
+    assert by_name["Llanowar Elves"].section == "commander"
+    assert by_name["Sol Ring"].section == "main"
+
+
 # --- deck resolution -------------------------------------------------------
 def test_resolve_deck_attaches_cards_and_flags_unresolved(db: CardDatabase) -> None:
     deck = resolve_deck(db, parse_decklist((FIXTURES / "deck_arena.txt").read_text()))
@@ -106,6 +172,23 @@ def test_parse_manabox_csv() -> None:
     assert foil_sol.quantity == 1 and foil_sol.set_code == "C21"
     assert foil_sol.purchase_price == 4.50
     assert items[0].scryfall_id == "11111111-1111-1111-1111-111111111111"
+
+
+def test_resolve_card_splits_single_slash_dfc_name(db: CardDatabase) -> None:
+    # User/export typed a single "/" (with spaces) instead of Scryfall's " // " join.
+    from mtg_analyzer.ingest.resolve import resolve_card
+
+    card = resolve_card(db, name="Delver of Secrets / Insectile Aberration")
+    assert card is not None
+    assert card.name == "Delver of Secrets // Insectile Aberration"
+
+
+def test_resolve_card_flavor_name_fallback(db: CardDatabase) -> None:
+    from mtg_analyzer.ingest.resolve import resolve_card
+
+    card = resolve_card(db, name="Helm's Deep")
+    assert card is not None
+    assert card.name == "Shinka, the Bloodsoaked Keep"
 
 
 def test_resolve_prefers_name_over_mismatched_set_collector(db: CardDatabase) -> None:

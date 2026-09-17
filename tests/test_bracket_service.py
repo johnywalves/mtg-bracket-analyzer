@@ -29,9 +29,14 @@ def unresolved_entry(name: str) -> ResolvedEntry:
 class _FakeScryfallClient:
     """Stands in for `ScryfallClient` — no network, just echoes back what the test wired up."""
 
-    def __init__(self, cards: list[Card] | None = None, *, error: Exception | None = None) -> None:
+    def __init__(self, cards: list[Card] | None = None, *, error: Exception | None = None,
+                 pt_hits: dict[str, list[Card]] | None = None,
+                 fuzzy_hits: dict[str, Card] | None = None) -> None:
         self._cards = cards or []
         self._error = error
+        # name (as passed to search()/named()) -> canned result, for Phase D's extended tail.
+        self._pt_hits = pt_hits or {}
+        self._fuzzy_hits = fuzzy_hits or {}
 
     async def __aenter__(self) -> Self:
         return self
@@ -43,10 +48,28 @@ class _FakeScryfallClient:
         if self._error is not None:
             raise self._error
         wanted = {ident["name"].lower() for ident in identifiers}
-        found = [c for c in self._cards if c.name.lower() in wanted]
+        # Real Scryfall /cards/collection matches a DFC by its front-face name too, not
+        # just the full "Front // Back" string — mirror that here.
+        found = [
+            c for c in self._cards
+            if c.name.lower() in wanted or c.name.split(" // ")[0].lower() in wanted
+        ]
         not_found = [ident for ident in identifiers if ident["name"].lower()
-                     not in {c.name.lower() for c in found}]
+                     not in {c.name.lower() for c in found}
+                     and ident["name"].lower() not in
+                     {c.name.split(" // ")[0].lower() for c in found}]
         return found, not_found
+
+    async def named(self, *, exact: str | None = None, fuzzy: str | None = None,
+                     set_code: str | None = None) -> Card | None:
+        return self._fuzzy_hits.get((exact or fuzzy or "").lower())
+
+    async def search(self, query: str, *, order: str = "name", unique: str = "cards") -> list[Card]:
+        # Tests key `pt_hits` by the bare name they expect resolve_card_live to search for.
+        for name, results in self._pt_hits.items():
+            if f'"{name}"' in query:
+                return results
+        return []
 
 
 def test_live_fill_resolves_and_upserts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -66,6 +89,34 @@ def test_live_fill_resolves_and_upserts(tmp_path: Path, monkeypatch: pytest.Monk
         assert deck.entries[0].card.name == "Sol Ring"
         assert db.get_by_name("Sol Ring") is not None  # self-healed the local DB
         assert any("Filled 1 card" in n for n in svc.notes)
+    finally:
+        db.close()
+
+
+def test_live_fill_retries_front_face_for_slash_joined_dfc_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # User typed the DFC name with a single "/" (not Scryfall's " // " join); the batch
+    # collection call misses on the full string, so a front-face-only retry must catch it.
+    db = CardDatabase(tmp_path / "test.db")
+    try:
+        goldbug = make_card(
+            "Goldbug, Humanity's Ally // Goldbug, Scrappy Scout",
+            layout="transform",
+        )
+        monkeypatch.setattr(
+            "mtg_analyzer.bracket_service.ScryfallClient",
+            lambda *a, **kw: _FakeScryfallClient([goldbug]),
+        )
+        svc = BracketService(db=db)
+        deck = ResolvedDeck(entries=[
+            unresolved_entry("Goldbug, Humanity's Ally / Goldbug, Scrappy Scout"),
+        ])
+
+        svc._live_fill_unresolved(db, deck)
+
+        assert deck.entries[0].resolved
+        assert deck.entries[0].card.name == "Goldbug, Humanity's Ally // Goldbug, Scrappy Scout"
     finally:
         db.close()
 
@@ -107,6 +158,77 @@ def test_live_fill_network_failure_is_graceful(
 
         assert not deck.entries[0].resolved
         assert any("backfill unavailable" in n for n in svc.notes)
+    finally:
+        db.close()
+
+
+def test_live_fill_resolves_via_live_pt_search_and_caches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Batch /cards/collection has no idea what "Anel Solar" is (that's a printed PT name,
+    # not the oracle name it indexes on) — the individual extended-tail fallback's live
+    # `lang:pt` search is what has to catch this.
+    db = CardDatabase(tmp_path / "test.db")
+    try:
+        sol_ring = make_card("Sol Ring")
+        monkeypatch.setattr(
+            "mtg_analyzer.bracket_service.ScryfallClient",
+            lambda *a, **kw: _FakeScryfallClient(pt_hits={"Anel Solar": [sol_ring]}),
+        )
+        svc = BracketService(db=db)
+        deck = ResolvedDeck(entries=[unresolved_entry("Anel Solar")])
+
+        svc._live_fill_unresolved(db, deck)
+
+        assert deck.entries[0].resolved
+        assert deck.entries[0].card.name == "Sol Ring"
+        assert db.get_by_name("Sol Ring") is not None  # canonical card self-healed too
+        assert db.get_localized_name("Anel Solar", lang="pt") == "Sol Ring"
+        assert any("Filled 1 card" in n for n in svc.notes)
+    finally:
+        db.close()
+
+
+def test_live_fill_ambiguous_pt_search_stays_unresolved_no_cache_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = CardDatabase(tmp_path / "test.db")
+    try:
+        monkeypatch.setattr(
+            "mtg_analyzer.bracket_service.ScryfallClient",
+            lambda *a, **kw: _FakeScryfallClient(
+                pt_hits={"Carta Ambigua": [make_card("Card A"), make_card("Card B")]}),
+        )
+        svc = BracketService(db=db)
+        deck = ResolvedDeck(entries=[unresolved_entry("Carta Ambigua")])
+
+        svc._live_fill_unresolved(db, deck)
+
+        assert not deck.entries[0].resolved
+        assert db.get_localized_name("Carta Ambigua", lang="pt") is None
+    finally:
+        db.close()
+
+
+def test_live_fill_individual_fallback_cap_notes_truncation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = CardDatabase(tmp_path / "test.db")
+    try:
+        monkeypatch.setattr("mtg_analyzer.bracket_service._MAX_INDIVIDUAL_LIVE_FALLBACKS", 1)
+        monkeypatch.setattr(
+            "mtg_analyzer.bracket_service.ScryfallClient",
+            lambda *a, **kw: _FakeScryfallClient([]),
+        )
+        svc = BracketService(db=db)
+        deck = ResolvedDeck(entries=[
+            unresolved_entry("Not A Real Card One"),
+            unresolved_entry("Not A Real Card Two"),
+        ])
+
+        svc._live_fill_unresolved(db, deck)
+
+        assert any("skipped the individual live-resolution fallback" in n for n in svc.notes)
     finally:
         db.close()
 

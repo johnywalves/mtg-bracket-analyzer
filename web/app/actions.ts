@@ -2,6 +2,7 @@
 
 import { analyzeDeck, MtgApiError } from "@/lib/api";
 import type { AnalyzeFormState } from "@/app/analyze-form-state";
+import { translateAnalysis } from "@/lib/i18n/translate-analysis";
 
 /** Server Action por trás do form de "colar deck" na home — mantém MTG_API_KEY no
  * servidor (lib/api.ts é `server-only`) e nunca expõe a chamada ao backend pro browser. */
@@ -16,7 +17,9 @@ export async function analyzeDeckAction(
 
   try {
     const result = await analyzeDeck(decklist);
-    return { result, error: null };
+    // Backend fica 100% em inglês (upstream stays original) — tradução acontece só
+    // aqui, na camada do Next.js. Ver web/lib/i18n/translate-analysis.ts.
+    return { result: translateAnalysis(result), error: null };
   } catch (cause) {
     return {
       result: null,

@@ -48,7 +48,12 @@ prices/images. Files are gzipped JSON — handle `content_encoding: gzip`.
 `eur`,`tix`; strings or null) · `set`/`set_name` · `collector_number` (string) · `image_uris`
 (`small`/`normal`/`large`/`png`/`art_crop`) · `card_faces` (array; see DFC below) · `produced_mana`
 (for ramp/mana-base analysis) · `power`/`toughness`/`loyalty` (strings, may be `*`) · `layout` ·
-`game_changer` (bool — bracket signal) · `edhrec_rank` · `reserved` · `rulings_uri`.
+`game_changer` (bool — bracket signal) · `edhrec_rank` · `reserved` · `rulings_uri` · `flavor_name`
+(top-level, only present on Universes Beyond reskins, e.g. `"Helm's Deep"` for *Shinka, the
+Bloodsoaked Keep* — for a multi-faced reskin it's per-face at `card_faces[i].flavor_name` instead)
+· `printed_name` (the name as printed on a specific non-English printing — distinct from `name`,
+which is always the English oracle name; only present when the printing itself is non-English,
+i.e. when querying with `lang:` set to something other than `en`).
 
 **Double-faced / multi-face handling:** branch on `layout`
 (`transform`/`modal_dfc`/`split`/`adventure`/`flip`/`meld`). For those, `mana_cost`, `oracle_text`,
@@ -72,11 +77,17 @@ Key operators: `id:`/`identity:` (color identity, with `<=` "fits in", `>=`, `=`
 `t:`/`type:` · `o:`/`oracle:` (`fo:` includes reminder text) · `f:commander` · `is:` (`is:commander`,
 `is:dual`, `is:permanent`) · `mv:`/`cmc:` · `pow:`/`tou:` · `r:` · `produces:` · `otag:`/`oracletag:`/
 `function:` (Tagger function tags — `otag:ramp`, `otag:removal`, `otag:card-advantage`,
-`otag:board-wipe`, `otag:tutor`, `otag:counterspell`) · `-` negation. Color nicknames: guilds
-(`azorius`), shards (`esper`), wedges (`mardu`), `c` colorless.
+`otag:board-wipe`, `otag:tutor`, `otag:counterspell`) · `-` negation · `lang:` (printing language,
+e.g. `lang:pt`; a quoted search phrase matches a printing's *localized* `printed_name`/text when
+combined with `lang:`, so `q="Anel Solar" lang:pt&unique=cards` finds the card printed as "Anel
+Solar" and returns it with the normal English `name` field plus that printing's `printed_name` —
+verified live 2026-09; useful for resolving a user-typed non-English card name with no local
+match). Color nicknames: guilds (`azorius`), shards (`esper`), wedges (`mardu`), `c` colorless.
 
 Examples: fits a Jeskai deck → `q=id<=jeskai f:commander`; legal Sultai commanders →
-`q=is:commander id:sultai`; cheap green ramp → `q=id<=g t:creature mv<=2 produces>=1 f:commander`.
+`q=is:commander id:sultai`; cheap green ramp → `q=id<=g t:creature mv<=2 produces>=1 f:commander`;
+resolve a Portuguese printed name → `q="<nome impresso>" lang:pt&unique=cards` (treat >1 result as
+ambiguous, don't guess).
 Tags are high-precision/low-recall — back them with oracle-text regex.
 
 ## Identification & batch lookup
