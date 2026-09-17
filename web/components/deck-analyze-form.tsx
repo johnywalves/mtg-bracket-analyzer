@@ -5,7 +5,9 @@ import { useActionState } from "react";
 import { analyzeDeckAction } from "@/app/actions";
 import { INITIAL_ANALYZE_STATE, type AnalyzeFormState } from "@/app/analyze-form-state";
 import { BracketBadge } from "@/components/bracket-badge";
+import { CardImage } from "@/components/card-image";
 import { Panel } from "@/components/panel";
+import { SIGNAL_CATEGORY_LABEL_PT } from "@/lib/rules/signal-labels";
 import type { AnalyzeResponse, Signal } from "@/lib/types";
 
 const CONFIDENCE_LABEL: Record<string, string> = {
@@ -137,14 +139,42 @@ function SignalList({ title, signals }: { title: string; signals: Signal[] }) {
   return (
     <div>
       <h3 className="text-sm font-medium text-fg">{title}</h3>
-      <ul className="mt-2 flex flex-col gap-1.5 text-sm text-muted">
+      <div className="mt-2 flex flex-col gap-4">
         {signals.map((signal) => (
-          <li key={signal.id}>
-            <span className="font-medium text-fg">{signal.category}</span> ({signal.strength}):{" "}
-            {signal.explanation}
-          </li>
+          <SignalCard key={signal.id} signal={signal} />
         ))}
-      </ul>
+      </div>
+    </div>
+  );
+}
+
+/** Um sinal do bracket (GAME_CHANGER, FAST_MANA, TUTOR, INTERACTION, DECK_SPEED, ...):
+ * nome amigável + explicação, e — quando o sinal tem cartas associadas — a grade de
+ * imagens das cartas que contaram pra ele (mesmo padrão de `/como-funciona`: clique
+ * na carta abre o preview em tela cheia via `CardImage`). DECK_SPEED é agregado (sem
+ * `card_or_cards` por evidência), então não renderiza grade. */
+function SignalCard({ signal }: { signal: Signal }) {
+  const cardNames = [...new Set(signal.evidence.flatMap((e) => e.card_or_cards))];
+
+  return (
+    <div className="rounded-lg border border-white/10 p-3">
+      <p className="text-sm text-muted">
+        <span className="font-medium text-fg">
+          {SIGNAL_CATEGORY_LABEL_PT[signal.category] ?? signal.category}
+        </span>{" "}
+        ({signal.strength}): {signal.explanation}
+      </p>
+
+      {cardNames.length > 0 ? (
+        <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {cardNames.map((name) => (
+            <figure key={name}>
+              <CardImage name={name} />
+              <figcaption className="mt-1.5 text-xs text-muted">{name}</figcaption>
+            </figure>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
