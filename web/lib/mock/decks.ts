@@ -1526,7 +1526,28 @@ export const MOCK_DECKS: DeckReport[] = [
   },
 ];
 
+/**
+ * Metadata de precon por nome de deck (nome → coleção/ano). Decks ausentes
+ * aqui são tratados como custom. No backend real isso virá da biblioteca de
+ * decks (deck_library) junto com a decklist.
+ */
+const PRECON_META: Record<string, { set_name: string; year: number }> = {
+  "Sauron, the Dark Lord": { set_name: "The Lord of the Rings Commander", year: 2023 },
+  "Frodo & Sam": { set_name: "The Lord of the Rings Commander", year: 2023 },
+  "Breena, the Demagogue": { set_name: "Strixhaven Commander", year: 2021 },
+  "Osgir, the Reconstructor": { set_name: "Strixhaven Commander", year: 2021 },
+  "Zaffai, Thunder Conductor": { set_name: "Strixhaven Commander", year: 2021 },
+  "Adrix and Nev, Twincasters": { set_name: "Strixhaven Commander", year: 2021 },
+  "Willowdusk, Essence Seer": { set_name: "Strixhaven Commander", year: 2021 },
+  "Killian, Decisive Mentor": { set_name: "Secrets of Strixhaven Commander", year: 2026 },
+  "Quintorius, History Chaser": { set_name: "Secrets of Strixhaven Commander", year: 2026 },
+  "Rootha, Mastering the Moment": { set_name: "Secrets of Strixhaven Commander", year: 2026 },
+  "Zimone, Infinite Analyst": { set_name: "Secrets of Strixhaven Commander", year: 2026 },
+  "Dina, Essence Brewer": { set_name: "Secrets of Strixhaven Commander", year: 2026 },
+};
+
 export function toSummary(report: DeckReport): DeckSummary {
+  const meta = PRECON_META[report.name ?? ""];
   return {
     slug: slugify(report.name ?? "deck-sem-nome"),
     name: report.name ?? "Deck sem nome",
@@ -1534,5 +1555,8 @@ export function toSummary(report: DeckReport): DeckSummary {
     identity: report.identity,
     bracket_estimate: report.bracket_estimate,
     legal: report.validation.legal,
+    kind: meta ? "precon" : "custom",
+    set_name: meta?.set_name ?? null,
+    year: meta?.year ?? null,
   };
 }

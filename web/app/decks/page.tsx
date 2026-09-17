@@ -1,4 +1,4 @@
-import { DeckCard } from "@/components/deck-card";
+import { DecksBrowser } from "@/components/decks-browser";
 import { listDecks } from "@/lib/mock/deck-service";
 
 export default async function DecksPage() {
@@ -9,11 +9,7 @@ export default async function DecksPage() {
       <h1 className="text-3xl font-semibold text-fg">Decks</h1>
       <p className="mt-2 text-muted">Análise de bracket dos seus decks de Commander.</p>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        {decks.map((deck) => (
-          <DeckCard key={deck.slug} deck={deck} />
-        ))}
-      </div>
+      <DecksBrowser decks={decks} />
     </main>
   );
 }

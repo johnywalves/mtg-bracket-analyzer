@@ -62,6 +62,12 @@ export interface DeckSummary {
   identity: string;
   bracket_estimate: number;
   legal: boolean;
+  /** "precon" = deck pré-construído oficial; "custom" = deck do usuário. */
+  kind: "precon" | "custom";
+  /** Coleção do precon (ex.: "Strixhaven Commander"); null em decks custom. */
+  set_name: string | null;
+  /** Ano de lançamento do precon; null em decks custom. */
+  year: number | null;
 }
 
 /**
