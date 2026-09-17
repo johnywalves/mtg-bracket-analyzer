@@ -871,3 +871,42 @@ Four-stage funnel (full detail in the **`mtg-data-ecosystem`** skill):
   `_estimate_confidence` now reports medium confidence with an explicit reason when no combo store
   is available, instead of silently claiming high confidence on incomplete data. 8 new/updated
   tests in `tests/test_bracket_engine.py`; **177 tests, ruff + mypy clean.**
+
+- **2026-09-17** — **Bracket analysis: commander fallback, reskin/DFC/PT-BR card resolution, and a
+  frontend-only PT-BR translation layer** — fixes for 5 issues found reviewing a real bracket-
+  analysis run (scope: `POST /api/v1/analyze` → `BracketService.analyze_decklist` only; the older
+  `DeckReport`/`/decks` mock path is already PT-authored and untouched).
+  - **Commander fallback:** `ingest/decklist.py` (`parse_decklist`, `parse_archidekt_csv`) now
+    promotes the first mainboard entry to `section="commander"` when the source had **zero**
+    explicit commander markers at all (no header/`// COMMANDER`/`[Commander]` tag) — new
+    `ParsedDeck.explicit_commander` flag guards this so an already-detected commander is never
+    overridden. The promoted card still flows through existing `MISSING_COMMANDER`/legality
+    validation downstream, so a genuinely illegal "first card" still surfaces as a real warning.
+  - **Card resolution:** `data/db.py` now indexes DFC back-face names (`back_name`) and Universes
+    Beyond reskin/flavor names (`flavor_name`/`back_flavor_name`, new `Card.flavor_name` /
+    `CardFace.flavor_name` fields, new `get_by_flavor_name`); `ingest/resolve.py`'s `resolve_card`
+    also splits a `/`-joined DFC name (single slash, not Scryfall's own `" // "` join) and retries
+    on the front face. `bracket_service.py`'s live Scryfall backfill does the same front-face retry
+    in its batched `/cards/collection` call.
+  - **On-demand PT-BR name search:** new `localized_name_cache` table + `db.get_localized_name`/
+    `cache_localized_name`; new `ingest/resolve.resolve_card_live` (async) — local exact → PT-name
+    cache → live English fuzzy (`ScryfallClient.named`) → live `lang:pt` search (caches on a single
+    unambiguous hit, gives up on ambiguous/zero results). Wired into `_live_fill_unresolved` as a
+    per-entry fallback after the batch pass, capped at 20 individual live calls per request
+    (`_MAX_INDIVIDUAL_LIVE_FALLBACKS`) to bound worst-case latency on garbage input. `flavor_name`
+    and the `lang:` search operator documented in `.claude/skills/scryfall-api/SKILL.md` (were
+    gaps in the skill).
+  - **PT-BR translation layer (frontend-only, upstream backend stays English/untouched):** new
+    `web/lib/i18n/templates.ts` (regex-template dictionary, one entry per backend format string
+    across `bracket_signals.py`/`engine.py`/`bracket_service.py`) + `web/lib/i18n/
+    translate-analysis.ts` (`translateAnalysis`, pure), wired into `app/actions.ts` right after
+    `analyzeDeck()` returns. Translates signal/evidence explanations, confidence reasons,
+    assessment warnings, and top-level notes; deliberately leaves `category`/`strength`/
+    `source_type`/`severity`/`code`/`bracket_name` and card names (`unresolved`,
+    `card_or_cards`) untouched. Unmatched strings fall back to English + a `console.warn` rather
+    than breaking the page. No test runner exists yet for `web/` — verified via a one-off
+    `node --experimental-strip-types` smoke script exercising every template (not committed);
+    `tsc --noEmit` clean (project's own `npm run lint` is broken independent of this change —
+    missing `eslint.config.js`, pre-existing).
+  - **192 backend tests passing, ruff + mypy clean** (new `SIM102` nits on lines this change didn't
+    touch are pre-existing style debt, left as-is).

@@ -15,6 +15,7 @@ legacy single-JSON-array layout are supported — see ``_stream_bulk_objects``.
 
 from __future__ import annotations
 
+import datetime
 import json
 import sqlite3
 from collections.abc import Iterator
@@ -34,17 +35,20 @@ NON_GAMEPLAY_LAYOUTS = frozenset(
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS cards (
-    oracle_id       TEXT PRIMARY KEY,
-    name            TEXT NOT NULL,
-    front_name      TEXT NOT NULL,              -- name before ' // ' (for DFC lookups)
-    cmc             REAL NOT NULL DEFAULT 0,
-    ci_key          TEXT NOT NULL DEFAULT '',   -- sorted color identity, e.g. 'GU'
-    type_line       TEXT,
-    commander_legal INTEGER NOT NULL DEFAULT 0,
-    game_changer    INTEGER NOT NULL DEFAULT 0,
-    layout          TEXT,
-    is_gameplay     INTEGER NOT NULL DEFAULT 1, -- 0 for art series / tokens / emblems
-    json            TEXT NOT NULL               -- full Scryfall card object
+    oracle_id        TEXT PRIMARY KEY,
+    name             TEXT NOT NULL,
+    front_name       TEXT NOT NULL,              -- name before ' // ' (for DFC lookups)
+    back_name        TEXT,                       -- name after ' // ', if any (DFC back face)
+    flavor_name      TEXT,                       -- Universes Beyond reskin name (front face)
+    back_flavor_name TEXT,                       -- reskin name of the back face, if any
+    cmc              REAL NOT NULL DEFAULT 0,
+    ci_key           TEXT NOT NULL DEFAULT '',   -- sorted color identity, e.g. 'GU'
+    type_line        TEXT,
+    commander_legal  INTEGER NOT NULL DEFAULT 0,
+    game_changer     INTEGER NOT NULL DEFAULT 0,
+    layout           TEXT,
+    is_gameplay      INTEGER NOT NULL DEFAULT 1, -- 0 for art series / tokens / emblems
+    json             TEXT NOT NULL               -- full Scryfall card object
 );
 CREATE INDEX IF NOT EXISTS idx_cards_name ON cards(name COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_cards_front ON cards(front_name COLLATE NOCASE);
@@ -70,9 +74,40 @@ CREATE TABLE IF NOT EXISTS rulings (
     comment      TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_rulings_oracle ON rulings(oracle_id);
+
+-- On-demand cache of localized (non-English) printed names → oracle_id, populated the
+-- first time a name resolves via a live `lang:<lang>` Scryfall search (see
+-- ingest.resolve.resolve_card_live). Avoids re-hitting the network for the same
+-- Portuguese/etc. name on a later decklist.
+CREATE TABLE IF NOT EXISTS localized_name_cache (
+    printed_name_normalized TEXT NOT NULL,  -- casefolded + stripped
+    lang                     TEXT NOT NULL,
+    oracle_id                TEXT NOT NULL,
+    cached_at                TEXT NOT NULL,
+    PRIMARY KEY (printed_name_normalized, lang)
+);
 """
 
 _BATCH = 1000
+
+
+def _name_columns(card: Card) -> tuple[str, str | None, str | None, str | None]:
+    """(front_name, back_name, flavor_name, back_flavor_name) for a card's indexed name columns.
+
+    front/back split on Scryfall's ``" // "`` DFC name join. flavor_name is the front face's
+    Universes Beyond reskin (top-level field); back_flavor_name is the back face's, read from
+    ``card_faces`` when present.
+    """
+    front_name, _, back_name_raw = card.name.partition(" // ")
+    back_name: str | None = back_name_raw or None
+    flavor_name = card.flavor_name
+    back_flavor_name = None
+    if card.card_faces:
+        if flavor_name is None:
+            flavor_name = card.card_faces[0].flavor_name
+        if len(card.card_faces) > 1:
+            back_flavor_name = card.card_faces[1].flavor_name
+    return front_name, back_name, flavor_name, back_flavor_name
 
 
 class CardDatabase:
@@ -82,6 +117,26 @@ class CardDatabase:
         self.conn = sqlite3.connect(self.path)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Add columns introduced after a DB was first created (`data/` is regenerable, but a
+        stale local snapshot shouldn't crash on startup — just re-ingest to backfill the new
+        columns)."""
+        existing = {row["name"] for row in self.conn.execute("PRAGMA table_info(cards)")}
+        for column in ("back_name", "flavor_name", "back_flavor_name"):
+            if column not in existing:
+                self.conn.execute(f"ALTER TABLE cards ADD COLUMN {column} TEXT")
+        # These indexes reference columns that may have just been added above, so they can't
+        # live in the initial CREATE-TABLE-IF-NOT-EXISTS script (would fail against a pre-
+        # existing table that predates the column).
+        self.conn.executescript(
+            "CREATE INDEX IF NOT EXISTS idx_cards_back ON cards(back_name COLLATE NOCASE);"
+            "CREATE INDEX IF NOT EXISTS idx_cards_flavor ON cards(flavor_name COLLATE NOCASE);"
+            "CREATE INDEX IF NOT EXISTS idx_cards_back_flavor "
+            "ON cards(back_flavor_name COLLATE NOCASE);"
+        )
+        self.conn.commit()
 
     def close(self) -> None:
         self.conn.close()
@@ -102,11 +157,15 @@ class CardDatabase:
         for card in _stream_cards(bulk_path):
             oracle_key = card.oracle_id or card.id
             ci_key = "".join(sorted(card.color_identity))
+            front_name, back_name, flavor_name, back_flavor_name = _name_columns(card)
             card_rows.append(
                 (
                     oracle_key,
                     card.name,
-                    card.name.split(" // ")[0],
+                    front_name,
+                    back_name,
+                    flavor_name,
+                    back_flavor_name,
                     card.cmc,
                     ci_key,
                     card.type_line,
@@ -141,8 +200,9 @@ class CardDatabase:
         if cards:
             cur.executemany(
                 "INSERT OR REPLACE INTO cards "
-                "(oracle_id, name, front_name, cmc, ci_key, type_line, commander_legal, "
-                " game_changer, layout, is_gameplay, json) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "(oracle_id, name, front_name, back_name, flavor_name, back_flavor_name, cmc, "
+                " ci_key, type_line, commander_legal, game_changer, layout, is_gameplay, json) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 cards,
             )
         if printings:
@@ -163,10 +223,14 @@ class CardDatabase:
         """
         oracle_key = card.oracle_id or card.id
         ci_key = "".join(sorted(card.color_identity))
+        front_name, back_name, flavor_name, back_flavor_name = _name_columns(card)
         card_row = (
             oracle_key,
             card.name,
-            card.name.split(" // ")[0],
+            front_name,
+            back_name,
+            flavor_name,
+            back_flavor_name,
             card.cmc,
             ci_key,
             card.type_line,
@@ -221,13 +285,27 @@ class CardDatabase:
         return self._card_from_row(row)
 
     def get_by_name(self, name: str) -> Card | None:
-        """Resolve a card by exact full name OR front-face name (case-insensitive).
+        """Resolve a card by exact full name, front-face name, or back-face name
+        (case-insensitive).
 
-        So "Delver of Secrets" resolves to the real transform card, not the
-        same-named art-series object. Gameplay cards win over non-gameplay ones.
+        So "Delver of Secrets" resolves to the real transform card, not the same-named
+        art-series object, and "Insectile Aberration" (its back face) resolves too.
+        Gameplay cards win over non-gameplay ones.
         """
         row = self.conn.execute(
             "SELECT json FROM cards WHERE name = ? COLLATE NOCASE OR front_name = ? COLLATE NOCASE "
+            "OR back_name = ? COLLATE NOCASE "
+            "ORDER BY is_gameplay DESC, length(name) LIMIT 1",
+            (name, name, name),
+        ).fetchone()
+        return self._card_from_row(row)
+
+    def get_by_flavor_name(self, name: str) -> Card | None:
+        """Resolve a Universes Beyond reskin name (e.g. "Helm's Deep") to its real card,
+        checking both the front and back face's flavor name."""
+        row = self.conn.execute(
+            "SELECT json FROM cards WHERE flavor_name = ? COLLATE NOCASE "
+            "OR back_flavor_name = ? COLLATE NOCASE "
             "ORDER BY is_gameplay DESC, length(name) LIMIT 1",
             (name, name),
         ).fetchone()
@@ -270,6 +348,23 @@ class CardDatabase:
             "SELECT MIN(usd) FROM printings WHERE oracle_id = ? AND usd IS NOT NULL", (oracle_id,)
         ).fetchone()
         return float(row[0]) if row and row[0] is not None else None
+
+    def get_localized_name(self, name: str, lang: str = "pt") -> str | None:
+        """oracle_id previously cached for this localized printed name, if any."""
+        row = self.conn.execute(
+            "SELECT oracle_id FROM localized_name_cache "
+            "WHERE printed_name_normalized = ? AND lang = ?",
+            (name.strip().lower(), lang),
+        ).fetchone()
+        return row["oracle_id"] if row else None
+
+    def cache_localized_name(self, name: str, oracle_id: str, lang: str = "pt") -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO localized_name_cache "
+            "(printed_name_normalized, lang, oracle_id, cached_at) VALUES (?,?,?,?)",
+            (name.strip().lower(), lang, oracle_id, datetime.datetime.now(datetime.UTC).isoformat()),
+        )
+        self.conn.commit()
 
     def get_rulings(self, oracle_id: str) -> list[Ruling]:
         rows = self.conn.execute(

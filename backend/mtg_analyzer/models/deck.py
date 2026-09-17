@@ -31,6 +31,10 @@ class ParsedDeck(BaseModel):
     name: str | None = None
     source_format: str | None = None  # "archidekt" | "arena" | "plain" | ...
     entries: list[DeckEntry]
+    # True when the source explicitly marked a commander (section header, "// COMMANDER"
+    # comment, or Archidekt [Commander]/Commander category). False means any
+    # section=="commander" entry was assigned by the first-card fallback in decklist.py.
+    explicit_commander: bool = False
 
 
 class ResolvedEntry(BaseModel):

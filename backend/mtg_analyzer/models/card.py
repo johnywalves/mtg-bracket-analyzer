@@ -21,6 +21,7 @@ class CardFace(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     name: str
+    flavor_name: str | None = None  # Universes Beyond reskin name for this face, if any
     mana_cost: str | None = None
     type_line: str | None = None
     oracle_text: str | None = None
@@ -40,6 +41,7 @@ class Card(BaseModel):
     oracle_id: str | None = None  # absent on some reversible cards (lives per-face)
     id: str  # Scryfall id of this specific printing
     name: str
+    flavor_name: str | None = None  # Universes Beyond reskin name (e.g. "Helm's Deep")
 
     # Gameplay (always trustworthy at top level, even for DFCs)
     cmc: float = 0.0

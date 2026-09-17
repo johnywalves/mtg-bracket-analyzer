@@ -95,5 +95,26 @@
     "color_identity": [],
     "legalities": {"commander": "not_legal"},
     "set": "sis"
+  },
+  {
+    "object": "card",
+    "id": "55555555-5555-5555-5555-555555555555",
+    "oracle_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+    "name": "Shinka, the Bloodsoaked Keep",
+    "flavor_name": "Helm's Deep",
+    "layout": "normal",
+    "cmc": 0.0,
+    "mana_cost": "",
+    "type_line": "Legendary Land",
+    "oracle_text": "{T}: Add {R}.",
+    "colors": [],
+    "color_identity": ["R"],
+    "keywords": [],
+    "legalities": {"commander": "legal"},
+    "set": "ltc",
+    "collector_number": "374",
+    "rarity": "rare",
+    "prices": {"usd": "2.00"},
+    "image_uris": {"normal": "https://cards.scryfall.io/normal/helms-deep.jpg"}
   }
 ]

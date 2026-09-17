@@ -18,7 +18,7 @@ def db(tmp_path: Path) -> Iterator[CardDatabase]:
 
 
 def test_ingest_counts(db: CardDatabase) -> None:
-    assert db.card_count() == 4  # incl. the art-series noise card
+    assert db.card_count() == 5  # incl. the art-series noise card + the flavor-name reskin
 
 
 def test_get_by_name_extracts_fields(db: CardDatabase) -> None:
@@ -89,7 +89,31 @@ def test_rulings_join(db: CardDatabase) -> None:
 
 def test_reingest_is_idempotent(db: CardDatabase) -> None:
     db.ingest_cards(FIXTURES / "oracle_cards_sample.json")  # second time
-    assert db.card_count() == 4  # INSERT OR REPLACE, not duplicated
+    assert db.card_count() == 5  # INSERT OR REPLACE, not duplicated
+
+
+def test_back_face_name_resolves(db: CardDatabase) -> None:
+    # "Insectile Aberration" is Delver's back face — must resolve to the same card.
+    card = db.get_by_name("Insectile Aberration")
+    assert card is not None
+    assert card.name == "Delver of Secrets // Insectile Aberration"
+
+
+def test_flavor_name_resolves(db: CardDatabase) -> None:
+    # "Helm's Deep" is a Universes Beyond reskin of Shinka, the Bloodsoaked Keep.
+    card = db.get_by_flavor_name("Helm's Deep")
+    assert card is not None
+    assert card.name == "Shinka, the Bloodsoaked Keep"
+    assert db.get_by_flavor_name("no such reskin") is None
+
+
+def test_pt_name_cache_roundtrip(db: CardDatabase) -> None:
+    assert db.get_localized_name("Anel Solar") is None
+    db.cache_localized_name("Anel Solar", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    assert db.get_localized_name("Anel Solar") == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    # normalized (case/whitespace-insensitive) and scoped per-language
+    assert db.get_localized_name("  ANEL SOLAR  ") == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    assert db.get_localized_name("Anel Solar", lang="es") is None
 
 
 def test_ingest_reads_jsonl_format(tmp_path: Path) -> None:

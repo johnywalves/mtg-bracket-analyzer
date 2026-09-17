@@ -27,10 +27,16 @@ from mtg_analyzer.combos.store import ComboStore
 from mtg_analyzer.data.db import CardDatabase
 from mtg_analyzer.data.scryfall_client import ScryfallClient
 from mtg_analyzer.ingest.decklist import parse_deck
-from mtg_analyzer.ingest.resolve import resolve_deck
+from mtg_analyzer.ingest.resolve import front_face_name, resolve_card_live, resolve_deck
 from mtg_analyzer.models.assessment import BracketAssessment
 from mtg_analyzer.models.card import Card
 from mtg_analyzer.models.deck import ResolvedDeck
+
+# Cap on individual (non-batched) live-resolution fallback calls per analyze_decklist
+# request — the batch /cards/collection pass above already handles the common case in one
+# call; this only guards a pathological all-garbage decklist from making a request issue
+# dozens of sequential live calls (each throttled ~100ms by ScryfallClient._request).
+_MAX_INDIVIDUAL_LIVE_FALLBACKS = 20
 
 
 @dataclass
@@ -76,14 +82,44 @@ class BracketService:
         if not unresolved:
             return
 
-        async def run() -> tuple[list[Card], list[dict]]:
+        # For a "/"-joined DFC name (single slash, not Scryfall's own " // " join — e.g.
+        # "Goldbug, Humanity's Ally / Goldbug, Scrappy Scout"), also request the front-face
+        # segment as a second identifier in the same batch, since /cards/collection only
+        # matches a card's exact name.
+        identifiers = [{"name": e.requested_name} for e in unresolved]
+        for e in unresolved:
+            if front := front_face_name(e.requested_name):
+                identifiers.append({"name": front})
+
+        async def run() -> tuple[list[Card], list[dict], dict[str, Card | None], int]:
             async with ScryfallClient() as client:
-                return await client.collection(
-                    [{"name": e.requested_name} for e in unresolved]
-                )
+                found, not_found = await client.collection(identifiers)
+                # Batch pass done — anything still unresolved after it (e.g. a Portuguese
+                # printed name, or a reskin/flavor name Scryfall's exact-name collection
+                # lookup doesn't match) gets one more try each through the full extended
+                # tail (local cache → live English fuzzy → live `lang:pt` search), capped
+                # so a decklist full of garbage names can't turn into dozens of sequential
+                # live calls on one request.
+                by_name = {c.name.lower(): c for c in found}
+                by_front = {c.name.split(" // ")[0].lower(): c for c in found}
+                still_unresolved = []
+                for entry in unresolved:
+                    key = entry.requested_name.lower()
+                    if key in by_name or key in by_front:
+                        continue
+                    if front := front_face_name(entry.requested_name):
+                        if front.lower() in by_name or front.lower() in by_front:
+                            continue
+                    still_unresolved.append(entry)
+                extended: dict[str, Card | None] = {}
+                for entry in still_unresolved[:_MAX_INDIVIDUAL_LIVE_FALLBACKS]:
+                    extended[entry.requested_name] = await resolve_card_live(
+                        db, client, entry.requested_name)
+                truncated = max(0, len(still_unresolved) - _MAX_INDIVIDUAL_LIVE_FALLBACKS)
+                return found, not_found, extended, truncated
 
         try:
-            found, _not_found = asyncio.run(run())
+            found, _not_found, extended, truncated = asyncio.run(run())
         except Exception as exc:  # noqa: BLE001 — network is best-effort; offline path still works
             self.notes.append(
                 f"Live Scryfall backfill unavailable — {type(exc).__name__} "
@@ -97,6 +133,19 @@ class BracketService:
             key = entry.requested_name.lower()
             card = by_name.get(key) or by_front.get(key)
             if card is None:
+                # Retry with just the front-face segment for a "/"-joined DFC name the
+                # collection batch missed on the full string (e.g. "Goldbug, Humanity's
+                # Ally / Goldbug, Scrappy Scout" — Scryfall only matches its own " // " join).
+                if front := front_face_name(entry.requested_name):
+                    card = by_name.get(front.lower()) or by_front.get(front.lower())
+            if card is None:
+                card = extended.get(entry.requested_name)
+                if card is None:
+                    continue
+                # resolve_card_live already upserted the card (and cached any PT name hit)
+                # itself — don't re-upsert here.
+                entry.card = card
+                filled += 1
                 continue
             db.upsert_card(card)
             entry.card = card
@@ -105,6 +154,10 @@ class BracketService:
         if filled:
             self.notes.append(
                 f"Filled {filled} card(s) live from Scryfall (not yet in the local bulk snapshot).")
+        if truncated:
+            self.notes.append(
+                f"{truncated} more unresolved card(s) skipped the individual live-resolution "
+                f"fallback (cap: {_MAX_INDIVIDUAL_LIVE_FALLBACKS} per request).")
 
     def _open_db(self) -> CardDatabase:
         """A connection scoped to the current call/thread — see `__init__`'s note on why a shared,
