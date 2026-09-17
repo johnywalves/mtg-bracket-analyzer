@@ -11,6 +11,8 @@ services:
     environment:
       - MTG_API_URL=${API_URL:-http://api_bracket:8000}
       - MTG_API_KEY=${API_KEY}
+    volumes:
+      - mtg_card_image_cache:/app/web/.cache/card-images
     depends_on:
       - api_bracket
 
@@ -29,3 +31,5 @@ services:
 volumes:
   mtg_data:
     name: mtg_data_vol
+  mtg_card_image_cache:
+    name: mtg_card_image_cache_vol

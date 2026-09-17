@@ -8,6 +8,9 @@
 # production
 /build
 
+# cache de imagens do Scryfall (regenerável, ver app/api/card-image/route.ts)
+/.cache/
+
 # env
 .env.local
 .env*.local

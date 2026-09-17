@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 
-// Hotlink oficial do Scryfall (permitido pela Fan Content Policy). Versão
-// "normal" sempre, nunca art_crop/border_crop, que cortam a linha de
-// copyright/artista (proibido pelo CLAUDE.md da raiz).
+// Proxy local (`app/api/card-image`) que busca no Scryfall e cacheia em disco —
+// evita hotlink direto do browser, que sob a rajada de imagens de uma grade de
+// deck perdia várias por rate limit. Versão "normal" sempre, nunca
+// art_crop/border_crop, que cortam a linha de copyright/artista (proibido pelo
+// CLAUDE.md da raiz).
 function scryfallImageUrl(name: string): string {
-  return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=normal`;
+  return `/api/card-image?name=${encodeURIComponent(name)}`;
 }
 
 /** Modal de tela cheia compartilhado por CardImage e CardNameLink. */
