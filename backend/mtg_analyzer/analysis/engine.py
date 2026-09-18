@@ -219,8 +219,14 @@ class BracketEngine:
         combo_sig = by_category.get("TWO_CARD_COMBO") or by_category.get("COMBO") \
             or by_category.get("MULTI_CARD_COMBO")
         if combo_sig:
-            early_cheap = combo_sig.strength == "high"
-            floor = max(floor, 4 if early_cheap else 3)
+            if combo_sig.bracket_floor_hint is not None:
+                # Commander Spellbook's own per-combo bracket tag is available — trust it over
+                # the MV≤3 heuristic (it can floor as low as 2 for an "oddball"/"core" combo,
+                # not just 3/4 like the old heuristic-only path).
+                floor = max(floor, combo_sig.bracket_floor_hint)
+            else:
+                early_cheap = combo_sig.strength == "high"
+                floor = max(floor, 4 if early_cheap else 3)
 
         ceiling = max(ceiling, min(floor + 1, 5))
         floor = min(floor, 5)

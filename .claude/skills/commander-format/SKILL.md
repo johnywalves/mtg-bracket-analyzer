@@ -80,6 +80,26 @@ Feb 2026) — brackets 1–2 allow none, 3 allows ≤3, 4+ unrestricted. Treat t
 **external versioned data**; Scryfall exposes a `game_changer` boolean per card. Estimate bracket
 from Game-Changer count + combo presence + tutor/fast-mana density.
 
+**Commander Spellbook's per-combo bracket tag** (different system — a tag on each *combo*, not
+the deck; source: https://commanderspellbook.com/syntax-guide/#bracket) feeds the COMBO signal's
+floor directly (`bracket_signals.combo_signal`/`_BRACKET_TAG_FLOOR`, `Combo.bracket_tag` ←
+`bracketTag` in the API payload). It shares two names with the deck-level system (Core, Exhibition)
+but is a distinct scale — don't conflate the two:
+
+| Tag | Bracket implied | Criteria |
+|---|---|---|
+| Ruthless | 4+ | Relevant two-card combo that's probably very fast, or infinite turns/mass land denial/infinite control of opponents' turns, or 4+ Game Changers |
+| Powerful | 3+ | Combo with a Game Changer, or a slow-but-relevant two-card combo |
+| Spicy | 3 (fuzzy) | Could be Ruthless but needs a third card, doesn't produce a relevant result, or stalls the game |
+| Oddball | 2 (fuzzy) | Could be Powerful but needs a third card, or doesn't produce a relevant result |
+| Core | 2+ | Extra-turn card without an extra-turn result, or a two-card combo too fast for bracket 1 |
+| Exhibition | 1 | Doesn't fit the other categories (casual/janky) |
+| Banned | — | Uses a card not legal in Commander |
+
+Used as a floor override, not a ceiling: an unrecognized/missing tag (or `Banned`, which shouldn't
+appear in a legal decklist) falls back to the local mana-value≤3 heuristic instead of forcing a
+number.
+
 ## Deck-composition heuristics (scoring targets, not hard rules)
 
 For a 99-card deck (Command Zone–style template):

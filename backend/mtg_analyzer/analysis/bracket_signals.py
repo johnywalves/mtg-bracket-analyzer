@@ -33,6 +33,22 @@ _RE_TUTOR_NARROW_TYPE = re.compile(
     r"(artifact|enchantment|creature|instant|sorcery|planeswalker)\b", re.S
 )
 
+#: Commander Spellbook's own per-combo classification (`bracketTag` on `Combo`, parsed in
+#: `models/combo.py`) mapped to the bracket number it implies — see
+#: https://commanderspellbook.com/syntax-guide/#bracket. `None` (banned/unrecognized) means
+#: "don't use this to set a floor" — `banned` combos use a card illegal in Commander, which
+#: shouldn't appear in a legal decklist anyway. Keys are lowercase; lookups normalize the raw
+#: tag before matching, since the API's casing isn't pinned by a local fixture.
+_BRACKET_TAG_FLOOR: dict[str, int | None] = {
+    "ruthless": 4,
+    "powerful": 3,
+    "spicy": 3,
+    "oddball": 2,
+    "core": 2,
+    "exhibition": 1,
+    "banned": None,
+}
+
 _RE_REMOVAL = re.compile(
     r"(destroy|exile) target|deals? \d+ damage to (target|any target)|"
     r"target (creature|permanent) gets [-−]", re.S
@@ -111,6 +127,7 @@ def combo_signal(deck: Deck, ruleset, combo_store: ComboStore | None) -> Signal 
     evidence = []
     any_two_card = False
     any_early_cheap = False
+    max_tag_floor: int | None = None  # highest bracket floor implied by a recognized bracket_tag
     for combo in found.included:
         names = [u.name for u in combo.uses]
         is_two_card = len(combo.uses) == 2
@@ -121,26 +138,44 @@ def combo_signal(deck: Deck, ruleset, combo_store: ComboStore | None) -> Signal 
             any_two_card = True
         if is_early_cheap:
             any_early_cheap = True
+
+        tag = (combo.bracket_tag or "").strip().lower()
+        tag_floor = _BRACKET_TAG_FLOOR.get(tag)
+        if tag_floor is not None:
+            max_tag_floor = tag_floor if max_tag_floor is None else max(max_tag_floor, tag_floor)
+            extra_note = f" (Commander Spellbook bracket tag: {tag})"
+        elif is_early_cheap:
+            # No usable tag (unrecognized/missing/banned) — fall back to the MV≤3 heuristic.
+            extra_note = " (both pieces cheap/early, mana value ≤ 3 — heuristic threshold)"
+        else:
+            extra_note = ""
+
         category = "TWO_CARD_COMBO" if is_two_card else "MULTI_CARD_COMBO"
-        cheap_note = " (both pieces cheap/early, mana value ≤ 3 — heuristic threshold)" \
-            if is_early_cheap else ""
+        impact = "high" if (tag_floor is not None and tag_floor >= 4) or \
+                            (tag_floor is None and is_early_cheap) else \
+                 "low" if (tag_floor is not None and tag_floor <= 2) else "medium"
         evidence.append(Evidence(
             id=f"ev-combo-{combo.id}",
             type=category.lower(),
             source=EvidenceSource(type="data", rules_version=ruleset.version),
             card_or_cards=names,
-            description=f"{' + '.join(names)} form a combo ({', '.join(combo.produces) or 'unspecified result'}){cheap_note}.",
-            impact="high" if is_early_cheap else "medium",
+            description=f"{' + '.join(names)} form a combo ({', '.join(combo.produces) or 'unspecified result'}){extra_note}.",
+            impact=impact,
         ))
 
     explanation = f"Found {len(found.included)} complete combo(s) in the decklist (offline combo cache)."
+    if max_tag_floor is None:
+        strength = "high" if any_early_cheap else "medium"
+    else:
+        strength = "high" if max_tag_floor >= 4 else "medium" if max_tag_floor == 3 else "low"
     return Signal(
         id="sig-official-combo",
         category="TWO_CARD_COMBO" if any_two_card else "COMBO",
         source_type="data",
-        strength="high" if any_early_cheap else "medium",
+        strength=strength,
         evidence=evidence,
         explanation=explanation + (" At least one is early/cheap." if any_early_cheap else ""),
+        bracket_floor_hint=max_tag_floor,
     )
 
 

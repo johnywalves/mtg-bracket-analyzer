@@ -120,6 +120,40 @@ function translateProduces(produces: string): string {
     .join(", ");
 }
 
+/**
+ * Nomes próprios das "bracket tags" que o Commander Spellbook atribui a cada combo
+ * (backend/mtg_analyzer/analysis/bracket_signals.py: `_BRACKET_TAG_FLOOR`, valor cru em
+ * `combo.bracket_tag`). Não traduzimos o nome — é um rótulo próprio da Spellbook — só
+ * normalizamos a capitalização pra exibição.
+ */
+const BRACKET_TAG_DISPLAY: Record<string, string> = {
+  ruthless: "Ruthless",
+  powerful: "Powerful",
+  spicy: "Spicy",
+  oddball: "Oddball",
+  core: "Core",
+  exhibition: "Exhibition",
+  banned: "Banned",
+};
+
+/** Traduz a nota adicional entre parênteses do `combo.evidence` (heurístico de MV≤3 ou a
+ * bracket tag do Commander Spellbook); nota desconhecida volta como veio (sem tradução). */
+function translateComboExtraNote(note: string): string {
+  if (!note) return note;
+  const inner = note.slice(2, -1); // remove " (" do início e ")" do final
+  if (inner === "both pieces cheap/early, mana value ≤ 3 — heuristic threshold") {
+    return " (ambas as peças baratas/rápidas, valor de mana ≤ 3, limiar heurístico)";
+  }
+  const tagMatch = /^Commander Spellbook bracket tag: (.+)$/.exec(inner);
+  if (tagMatch) {
+    const tag = tagMatch[1];
+    const display = BRACKET_TAG_DISPLAY[tag] ?? tag;
+    return ` (tag de bracket do Commander Spellbook: ${display})`;
+  }
+  console.warn(`[i18n] Sem tradução para nota de combo: ${JSON.stringify(note)}`);
+  return note;
+}
+
 export const TEMPLATES: TranslationTemplate[] = [
   // --- bracket_signals.py: GAME_CHANGER -------------------------------------------------
   {
@@ -136,13 +170,10 @@ export const TEMPLATES: TranslationTemplate[] = [
   // --- bracket_signals.py: COMBO ---------------------------------------------------------
   {
     name: "combo.evidence",
-    pattern:
-      /^(.+) form a combo \(([^)]*)\)((?: \(both pieces cheap\/early, mana value ≤ 3 — heuristic threshold\))?)\.$/,
-    render: ([names, produces, cheapNote]) =>
+    pattern: /^(.+) form a combo \(([^)]*)\)( \([^)]*\))?\.$/,
+    render: ([names, produces, extraNote]) =>
       `${names} formam um combo (${translateProduces(produces)})` +
-      (cheapNote
-        ? " (ambas as peças baratas/rápidas, valor de mana ≤ 3, limiar heurístico)"
-        : "") +
+      translateComboExtraNote(extraNote ?? "") +
       ".",
   },
   {

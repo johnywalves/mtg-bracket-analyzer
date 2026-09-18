@@ -48,6 +48,11 @@ class Signal(BaseModel):
     strength: Literal["low", "medium", "high"]
     evidence: list[Evidence]
     explanation: str
+    # Optional bracket-floor override from a signal that already knows a concrete bracket
+    # number (e.g. COMBO signals using Commander Spellbook's own per-combo bracket tag —
+    # see bracket_signals.combo_signal). None means "no concrete floor known — the engine's
+    # `_classify` should fall back to its own strength-based heuristic for this category."
+    bracket_floor_hint: int | None = None
 
 class Confidence(BaseModel):
     level: Literal["low", "medium", "high"]
