@@ -136,7 +136,7 @@ const SOURCES: { label: string; href: string; note: string }[] = [
     note: "Base de combos usada pra detectar peças de combo prontas no deck.",
   },
   {
-    label: "Commander Spellbook — Syntax guide (bracket tags)",
+    label: "Commander Spellbook: Syntax guide (bracket tags)",
     href: "https://commanderspellbook.com/syntax-guide/#bracket",
     note: "Classificação de bracket que o próprio Commander Spellbook atribui a cada combo, usada pra estimar a força de um combo encontrado no deck.",
   },
@@ -223,7 +223,7 @@ export default function ComoFuncionaPage() {
           <strong className="text-fg">piso e teto</strong>: cada sinal oficial
           (Game Changers, negação de terrenos, turnos extras, combos) empurra o{" "}
           <strong className="text-fg">piso</strong> pra cima de forma
-          independente — nenhum deles é opcional ou "pesa mais que o outro".
+          independente, e nenhum deles é opcional ou "pesa mais que o outro".
           Só depois disso, sinais heurísticos (mana rápida, tutores,
           interação) podem empurrar o número final <strong>1 bracket acima
           do piso</strong>, mas nunca abrem o teto sozinhos nem substituem os
@@ -233,9 +233,9 @@ export default function ComoFuncionaPage() {
           <Panel>
             <h3 className="font-medium text-fg">1. Piso por Game Changers</h3>
             <p className="mt-1.5 text-justify text-sm text-muted">
-              0 Game Changers → piso 1. 1 a 3 → piso pelo menos 3. 4 ou mais →
-              piso pelo menos 4 (reflete o próprio limite oficial: brackets 1
-              e 2 não permitem nenhuma, o bracket 3 permite até 3).
+              0 Game Changers resulta em piso 1; de 1 a 3, piso pelo menos 3;
+              4 ou mais, piso pelo menos 4 (reflete o próprio limite oficial:
+              brackets 1 e 2 não permitem nenhuma, o bracket 3 permite até 3).
             </p>
           </Panel>
           <Panel>
@@ -243,34 +243,34 @@ export default function ComoFuncionaPage() {
               2. Piso por negação massiva de terrenos
             </h3>
             <p className="mt-1.5 text-justify text-sm text-muted">
-              Qualquer ocorrência já trava o piso em pelo menos o bracket 4 —
-              é tratado como efeito de alto impacto por si só.
+              Qualquer ocorrência já trava o piso em pelo menos o bracket 4,
+              pois é tratado como efeito de alto impacto por si só.
             </p>
           </Panel>
           <Panel>
             <h3 className="font-medium text-fg">3. Piso por turno extra</h3>
             <p className="mt-1.5 text-justify text-sm text-muted">
               Repetível/encadeável (permanente, ou feitiço com gatilho
-              recorrente) → piso pelo menos 4. Feitiço avulso, de uso único →
-              piso pelo menos 2.
+              recorrente) resulta em piso pelo menos 4. Feitiço avulso, de uso
+              único, resulta em piso pelo menos 2.
             </p>
           </Panel>
           <Panel>
             <h3 className="font-medium text-fg">4. Piso por combo pronto</h3>
             <p className="mt-1.5 text-justify text-sm text-muted">
               Usa a bracket tag que o Commander Spellbook atribui ao combo
-              quando ela existe (Ruthless → piso 4, Powerful/Spicy → piso 3,
-              Oddball/Core → piso 2, Exhibition → piso 1). Sem essa
-              classificação, cai no heurístico: combo de duas cartas com
-              ambas custando até 3 de mana → piso pelo menos 4; qualquer
-              outro combo completo → piso pelo menos 3.
+              quando ela existe: piso 4 para Ruthless, piso 3 para
+              Powerful/Spicy, piso 2 para Oddball/Core, piso 1 para
+              Exhibition. Sem essa classificação, cai no heurístico: combo de
+              duas cartas com ambas custando até 3 de mana resulta em piso
+              pelo menos 4; qualquer outro combo completo, piso pelo menos 3.
             </p>
           </Panel>
           <Panel>
             <h3 className="font-medium text-fg">5. Teto</h3>
             <p className="mt-1.5 text-justify text-sm text-muted">
               O teto é sempre pelo menos o bracket 3, ou piso + 1 quando o
-              piso já passou de 2 — limitado ao bracket 5. Ou seja, o teto
+              piso já passou de 2 (limitado ao bracket 5). Ou seja, o teto
               nunca fica abaixo do piso nem passa de 5.
             </p>
           </Panel>
@@ -282,7 +282,7 @@ export default function ComoFuncionaPage() {
               Com pelo menos 2 cartas de mana rápida curada, um tutor amplo
               (busca qualquer carta, não um tipo específico), ou densidade
               alta de interação (≥15% das cartas não-terreno), a estimativa
-              final sobe 1 bracket acima do piso — sem nunca ultrapassar o
+              final sobe 1 bracket acima do piso, sem nunca ultrapassar o
               teto calculado no passo 5.
             </p>
           </Panel>
@@ -294,7 +294,7 @@ export default function ComoFuncionaPage() {
               Calculamos também uma velocidade estimada (baixa/média/alta) a
               partir da curva de mana, mana rápida, densidade de tutores e
               presença de combo. Esse número aparece na análise só como
-              contexto — ele sozinho nunca move o piso, o teto nem o bracket
+              contexto: ele sozinho nunca move o piso, o teto nem o bracket
               final.
             </p>
           </Panel>
@@ -360,7 +360,7 @@ export default function ComoFuncionaPage() {
           Além das Game Changers, o Meus Brackets olha se o deck tem combos
           prontos (peças que juntas geram um loop infinito ou uma vitória
           imediata) e sinais adicionais de alto impacto, como{" "}
-          {signals.map((key) => SIGNAL_LABELS[key] ?? key).join(", ")} — cada
+          {signals.map((key) => SIGNAL_LABELS[key] ?? key).join(", ")}, e cada
           um define o piso da estimativa de forma independente (ver "Como o
           cálculo funciona" acima), não são pontos somados.
         </p>
@@ -368,7 +368,7 @@ export default function ComoFuncionaPage() {
           Pra decidir o quão forte é um combo encontrado, usamos primeiro a{" "}
           <strong className="text-fg">bracket tag</strong> que o próprio
           Commander Spellbook atribui a cada combo (Ruthless, Powerful, Spicy,
-          Oddball, Core, Exhibition ou Banned — não confundir com os nomes dos
+          Oddball, Core, Exhibition ou Banned, sem confundir com os nomes dos
           5 brackets do deck, apesar de dois deles coincidirem). Quando o
           combo não tem essa classificação, caímos num heurístico próprio:
           combo de duas cartas em que ambas custam até 3 de mana já conta como
