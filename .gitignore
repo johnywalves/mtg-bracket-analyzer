@@ -39,3 +39,6 @@ frontend/.vite/
 *.swp
 .idea/
 .vscode/
+
+# Temporary scripts
+/*.py

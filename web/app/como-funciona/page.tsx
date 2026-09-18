@@ -94,7 +94,8 @@ const SIGNAL_DESCRIPTIONS: Record<
       "). Multiplicam o número de land drops, ativações e ataques do jogador, então pesam a favor de um bracket mais alto.",
   },
   mass_land_denial: {
-    before: "Cartas que destroem ou travam os terrenos de todos os oponentes (ex.: ",
+    before:
+      "Cartas que destroem ou travam os terrenos de todos os oponentes (ex.: ",
     examples: ["Armageddon", "Winter Orb"],
     after:
       "). É considerado um efeito de alto impacto pelo próprio sistema de brackets da Wizards, então soma na estimativa.",
@@ -174,16 +175,19 @@ export default function ComoFuncionaPage() {
       <section className="mt-10">
         <h2 className="text-xl font-semibold text-fg">Regras do formato</h2>
         <p className="mt-3 text-justify text-muted">
-          Commander é jogado com exatamente <strong className="text-fg">100 cartas</strong> (99 +
-          1 comandante), em modo <strong className="text-fg">singleton</strong>: nenhum nome
-          repetido, exceto terrenos básicos. O comandante precisa ser uma criatura lendária (ou
-          uma carta que diga explicitamente "pode ser seu comandante"), e toda carta do deck
-          precisa ter identidade de cor <strong className="text-fg">dentro</strong> da identidade
-          do comandante, considerando símbolos de mana no custo e no texto, não a cor do frame.
-          Cartas na lista de banidos (mantida e atualizada pela própria Wizards) não podem entrar
-          no deck. Cada jogador começa com <strong className="text-fg">40 pontos de vida</strong>{" "}
-          numa mesa padrão de 4 jogadores, e 21+ de dano de combate vindo de um único comandante
-          já elimina o jogador, independente da vida restante.
+          Commander é jogado com exatamente{" "}
+          <strong className="text-fg">100 cartas</strong> (99 + 1 comandante),
+          em modo <strong className="text-fg">singleton</strong>: nenhum nome
+          repetido, exceto terrenos básicos. O comandante precisa ser uma
+          criatura lendária (ou uma carta que diga explicitamente "pode ser seu
+          comandante"), e toda carta do deck precisa ter identidade de cor{" "}
+          <strong className="text-fg">dentro</strong> da identidade do
+          comandante, considerando símbolos de mana no custo e no texto, não a
+          cor do frame. Cartas na lista de banidos (mantida e atualizada pela
+          própria Wizards) não podem entrar no deck. Cada jogador começa com{" "}
+          <strong className="text-fg">40 pontos de vida</strong> numa mesa
+          padrão de 4 jogadores, e 21+ de dano de combate vindo de um único
+          comandante já elimina o jogador, independente da vida restante.
         </p>
       </section>
 
@@ -235,7 +239,7 @@ export default function ComoFuncionaPage() {
                 ) : null}
                 <span className="text-sm text-muted">({cards.length})</span>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-5">
                 {cards.map(({ name, identity }) => (
                   <figure key={name}>
                     <CardImage name={name} />
@@ -272,7 +276,9 @@ export default function ComoFuncionaPage() {
             const info = SIGNAL_DESCRIPTIONS[key];
             return (
               <Panel key={key}>
-                <h3 className="font-medium text-fg">{SIGNAL_LABELS[key] ?? key}</h3>
+                <h3 className="font-medium text-fg">
+                  {SIGNAL_LABELS[key] ?? key}
+                </h3>
                 <p className="mt-1.5 text-justify text-sm text-muted">
                   {info ? (
                     <>

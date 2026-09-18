@@ -1,13 +1,13 @@
 /**
  * Dicionário de tradução EN → PT-BR para as frases de texto livre que o backend do
  * Bracket Engine gera (backend/mtg_analyzer/analysis/bracket_signals.py, engine.py,
- * bracket_service.py). O backend em si fica 100% em inglês — a tradução acontece
+ * bracket_service.py). O backend em si fica 100% em inglês; a tradução acontece
  * só aqui, no lado do Next.js (ver `translate-analysis.ts`).
  *
  * Cada entrada casa uma regex contra a frase exata que o backend produz e reconstrói
  * a versão em português a partir dos grupos capturados (contagens, nomes de carta,
  * percentuais etc.). Uma frase que não casa com nenhuma entrada volta sem alteração
- * (inglês) — ver `translateString` — e um aviso é logado no console do servidor, pra
+ * (inglês, ver `translateString`) e um aviso é logado no console do servidor, pra
  * dar pra perceber quando os textos do backend mudarem e o dicionário ficar desatualizado.
  *
  * IMPORTANTE: ao alterar uma f-string em bracket_signals.py/engine.py/bracket_service.py,
@@ -42,16 +42,30 @@ function translateInteractionSummary(summary: string): string {
     .join(", ");
 }
 
-const PRESENT_ABSENT_PT: Record<string, string> = { present: "presente", absent: "ausente" };
-const SPEED_PT: Record<string, string> = { low: "baixa", medium: "média", high: "alta" };
-/** Tradução dos níveis de força de um sinal (strength: low/medium/high) — usado
+const PRESENT_ABSENT_PT: Record<string, string> = {
+  present: "presente",
+  absent: "ausente",
+};
+const SPEED_PT: Record<string, string> = {
+  low: "baixa",
+  medium: "média",
+  high: "alta",
+};
+/** Tradução dos níveis de força de um sinal (strength: low/medium/high), usado
  * na UI ao lado do nome da categoria, ex. "Game Changers (alto)". */
-export const STRENGTH_PT: Record<string, string> = { low: "baixo", medium: "médio", high: "alto" };
+export const STRENGTH_PT: Record<string, string> = {
+  low: "baixo",
+  medium: "médio",
+  high: "alto",
+};
 const EXTRA_TURN_KIND_PT: Record<string, string> = {
   "repeatable/chainable": "repetível/encadeável",
   "one-shot spell": "feitiço único",
 };
-const TUTOR_KIND_PT: Record<string, string> = { narrow: "estreita", broad: "ampla" };
+const TUTOR_KIND_PT: Record<string, string> = {
+  narrow: "estreita",
+  broad: "ampla",
+};
 
 export const TEMPLATES: TranslationTemplate[] = [
   // --- bracket_signals.py: GAME_CHANGER -------------------------------------------------
@@ -74,7 +88,7 @@ export const TEMPLATES: TranslationTemplate[] = [
     render: ([names, produces, cheapNote]) =>
       `${names} formam um combo (${produces})` +
       (cheapNote
-        ? " (ambas as peças baratas/rápidas, valor de mana ≤ 3 — limiar heurístico)"
+        ? " (ambas as peças baratas/rápidas, valor de mana ≤ 3, limiar heurístico)"
         : "") +
       ".",
   },
@@ -90,22 +104,28 @@ export const TEMPLATES: TranslationTemplate[] = [
   // --- bracket_signals.py: EXTRA_TURN -----------------------------------------------------
   {
     name: "extra_turn.evidence",
-    pattern: /^(.+) grants an extra turn \((repeatable\/chainable|one-shot spell)\)\.$/,
-    render: ([name, kind]) => `${name} concede um turno extra (${EXTRA_TURN_KIND_PT[kind] ?? kind}).`,
+    pattern:
+      /^(.+) grants an extra turn \((repeatable\/chainable|one-shot spell)\)\.$/,
+    render: ([name, kind]) =>
+      `${name} concede um turno extra (${EXTRA_TURN_KIND_PT[kind] ?? kind}).`,
   },
   {
     name: "extra_turn.explanation",
-    pattern: /^Found (\d+) extra-turn effect\(s\)(, including repeatable\/chainable ones\.|\.)$/,
+    pattern:
+      /^Found (\d+) extra-turn effect\(s\)(, including repeatable\/chainable ones\.|\.)$/,
     render: ([n, suffix]) =>
       `Encontrado(s) ${n} efeito(s) de turno extra` +
-      (suffix.startsWith(",") ? ", incluindo efeitos repetíveis/encadeáveis." : "."),
+      (suffix.startsWith(",")
+        ? ", incluindo efeitos repetíveis/encadeáveis."
+        : "."),
   },
 
   // --- bracket_signals.py: MASS_LAND_DENIAL -----------------------------------------------
   {
     name: "mld.evidence",
     pattern: /^(.+) symmetrically denies\/destroys multiple players' lands\.$/,
-    render: ([name]) => `${name} nega/destrói simetricamente terrenos de múltiplos jogadores.`,
+    render: ([name]) =>
+      `${name} nega/destrói simetricamente terrenos de múltiplos jogadores.`,
   },
   {
     name: "mld.explanation",
@@ -113,7 +133,7 @@ export const TEMPLATES: TranslationTemplate[] = [
       /^Found (\d+) mass land denial effect\(s\) \(symmetric, non-replacing — single-target land removal doesn't count\)\.$/,
     render: ([n]) =>
       `Encontrado(s) ${n} efeito(s) de negação massiva de terrenos ` +
-      "(simétrico, não substitutivo — remoção de terreno único não conta).",
+      "(simétrico, não substitutivo; remoção de terreno único não conta).",
   },
 
   // --- bracket_signals.py: FAST_MANA ------------------------------------------------------
@@ -128,14 +148,15 @@ export const TEMPLATES: TranslationTemplate[] = [
       /^(\d+) fast-mana card\(s\), (\d+)% of nonland cards \(heuristic only — does not by itself set the bracket\)\.$/,
     render: ([n, pct]) =>
       `${n} carta(s) de mana rápida, ${pct}% das cartas não-terreno ` +
-      "(apenas heurístico — não define o bracket sozinho).",
+      "(apenas heurístico: não define o bracket sozinho).",
   },
 
   // --- bracket_signals.py: TUTOR -----------------------------------------------------------
   {
     name: "tutor.evidence",
     pattern: /^(.+) tutors for a card \((narrow|broad)\)\.$/,
-    render: ([name, kind]) => `${name} busca uma carta (${TUTOR_KIND_PT[kind] ?? kind}).`,
+    render: ([name, kind]) =>
+      `${name} busca uma carta (${TUTOR_KIND_PT[kind] ?? kind}).`,
   },
   {
     name: "tutor.explanation",
@@ -143,15 +164,17 @@ export const TEMPLATES: TranslationTemplate[] = [
       /^(\d+) tutor\(s\) \((\d+) broad, (\d+) narrow\), (\d+)% density\. Tutors are consistency\/heuristic signal only — no longer bracket-restricting per the Oct 2025 rules update\.$/,
     render: ([n, broad, narrow, pct]) =>
       `${n} tutor(es) (${broad} amplo(s), ${narrow} estreito(s)), densidade de ${pct}%. ` +
-      "Tutores são sinal de consistência/heurístico apenas — não restringem mais o bracket " +
+      "Tutores são sinal de consistência/heurístico apenas: não restringem mais o bracket " +
       "desde a atualização de regras de out/2025.",
   },
 
   // --- bracket_signals.py: INTERACTION -----------------------------------------------------
   {
     name: "interaction.evidence",
-    pattern: /^(.+) provides (removal|board wipe|counterspell|graveyard hate|protection)\.$/,
-    render: ([name, kind]) => `${name} fornece ${INTERACTION_KIND_PT[kind] ?? kind}.`,
+    pattern:
+      /^(.+) provides (removal|board wipe|counterspell|graveyard hate|protection)\.$/,
+    render: ([name, kind]) =>
+      `${name} fornece ${INTERACTION_KIND_PT[kind] ?? kind}.`,
   },
   {
     name: "interaction.explanation",
@@ -179,7 +202,7 @@ export const TEMPLATES: TranslationTemplate[] = [
       /^Estimated deck speed: (low|medium|high) \(context signal only — does not by itself set the bracket\)\.$/,
     render: ([speed]) =>
       `Velocidade de deck estimada: ${SPEED_PT[speed] ?? speed} ` +
-      "(sinal de contexto apenas — não define o bracket sozinho).",
+      "(sinal de contexto apenas; não define o bracket sozinho).",
   },
 
   // --- engine.py: validation warnings -------------------------------------------------------
@@ -210,7 +233,7 @@ export const TEMPLATES: TranslationTemplate[] = [
     pattern:
       /^No combo data available — TWO_CARD_COMBO signal skipped \(INCOMPLETE_COMBO_DATA\)\.$/,
     render: () =>
-      "Dados de combo indisponíveis — sinal TWO_CARD_COMBO ignorado (INCOMPLETE_COMBO_DATA).",
+      "Dados de combo indisponíveis: sinal de combo de duas peças ignorado (dados de combo incompletos).",
   },
   {
     name: "confidence.fully_valid",
@@ -221,14 +244,16 @@ export const TEMPLATES: TranslationTemplate[] = [
   // --- bracket_service.py: top-level notes --------------------------------------------------
   {
     name: "note.live_backfill_unavailable",
-    pattern: /^Live Scryfall backfill unavailable — (.+) \(offline or rate-limited\); skipped\.$/,
+    pattern:
+      /^Live Scryfall backfill unavailable — (.+) \(offline or rate-limited\); skipped\.$/,
     render: ([excType]) =>
-      `Preenchimento ao vivo via Scryfall indisponível — ${excType} (offline ou limite de ` +
+      `Preenchimento ao vivo via Scryfall indisponível: ${excType} (offline ou limite de ` +
       "taxa); ignorado.",
   },
   {
     name: "note.filled_live",
-    pattern: /^Filled (\d+) card\(s\) live from Scryfall \(not yet in the local bulk snapshot\)\.$/,
+    pattern:
+      /^Filled (\d+) card\(s\) live from Scryfall \(not yet in the local bulk snapshot\)\.$/,
     render: ([n]) =>
       `Preenchida(s) ${n} carta(s) ao vivo via Scryfall (ainda não presente(s) no snapshot local).`,
   },
@@ -253,7 +278,7 @@ export const TEMPLATES: TranslationTemplate[] = [
     pattern:
       /^Live combo lookup unavailable — (.+) \(offline or rate-limited\); using cached combo data only\.$/,
     render: ([excType]) =>
-      `Consulta de combos ao vivo indisponível — ${excType} (offline ou limite de taxa); ` +
+      `Consulta de combos ao vivo indisponível: ${excType} (offline ou limite de taxa); ` +
       "usando apenas dados de combo em cache.",
   },
 ];

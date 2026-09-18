@@ -3,7 +3,10 @@
 import { useActionState } from "react";
 
 import { analyzeDeckAction } from "@/app/actions";
-import { INITIAL_ANALYZE_STATE, type AnalyzeFormState } from "@/app/analyze-form-state";
+import {
+  INITIAL_ANALYZE_STATE,
+  type AnalyzeFormState,
+} from "@/app/analyze-form-state";
 import { BracketBadge } from "@/components/bracket-badge";
 import { CardImage } from "@/components/card-image";
 import { Panel } from "@/components/panel";
@@ -21,10 +24,10 @@ const CONFIDENCE_LABEL: Record<string, string> = {
  * (via Server Action, ver app/actions.ts) e renderiza o BracketAssessment devolvido.
  * Com `offline`, cobre o form com um overlay de "backend indisponível". */
 export function DeckAnalyzeForm({ offline = false }: { offline?: boolean }) {
-  const [state, formAction, pending] = useActionState<AnalyzeFormState, FormData>(
-    analyzeDeckAction,
-    INITIAL_ANALYZE_STATE,
-  );
+  const [state, formAction, pending] = useActionState<
+    AnalyzeFormState,
+    FormData
+  >(analyzeDeckAction, INITIAL_ANALYZE_STATE);
 
   return (
     <Panel className="relative">
@@ -36,7 +39,9 @@ export function DeckAnalyzeForm({ offline = false }: { offline?: boolean }) {
           id="decklist"
           name="decklist"
           rows={10}
-          placeholder={"1 Sol Ring\n1 Sauron, the Dark Lord\n1 Cyclonic Rift\n..."}
+          placeholder={
+            "1 Sol Ring\n1 Sauron, the Dark Lord\n1 Cyclonic Rift\n..."
+          }
           className="w-full rounded-lg border border-white/20 bg-bg p-3 text-sm text-fg placeholder:text-muted focus:border-accent-primary focus:outline-none"
         />
         <button
@@ -79,9 +84,7 @@ function AnalyzeResult({ response }: { response: AnalyzeResponse }) {
             </p>
             <div
               className={
-                assessment.commanders.length > 1
-                  ? "grid grid-cols-2 gap-3"
-                  : ""
+                assessment.commanders.length > 1 ? "grid grid-cols-2 gap-3" : ""
               }
             >
               {assessment.commanders.map((name) => (
@@ -89,18 +92,19 @@ function AnalyzeResult({ response }: { response: AnalyzeResponse }) {
               ))}
             </div>
           </div>
-        ) : null}
+        ) : (
+          <span></span>
+        )}
         <div className="flex flex-col gap-2 self-start">
-          <div className="flex flex-wrap items-center gap-4">
-            <BracketBadge tier={assessment.bracket} size="lg" />
-            <p className="text-sm text-muted">
-              Faixa provável: {assessment.minimum_bracket}–{assessment.maximum_bracket} ·
-              Confiança:{" "}
-              <span className="font-medium text-fg">
-                {CONFIDENCE_LABEL[assessment.confidence.level] ?? assessment.confidence.level}
-              </span>
-            </p>
-          </div>
+          <BracketBadge tier={assessment.bracket} size="lg" />
+          <p className="text-sm text-muted">
+            Faixa provável: {assessment.minimum_bracket}–
+            {assessment.maximum_bracket} · Confiança:{" "}
+            <span className="font-medium text-fg">
+              {CONFIDENCE_LABEL[assessment.confidence.level] ??
+                assessment.confidence.level}
+            </span>
+          </p>
           {assessment.confidence.reasons.length > 0 ? (
             <ul className="list-inside list-disc text-xs text-muted">
               {assessment.confidence.reasons.map((reason) => (
@@ -111,18 +115,17 @@ function AnalyzeResult({ response }: { response: AnalyzeResponse }) {
         </div>
       </div>
 
-      <SignalList
-        title="Sinais oficiais"
-        signals={assessment.official_signals}
-        kind="official"
-      />
-      <SignalList
-        title="Sinais heurísticos"
-        signals={assessment.heuristic_signals}
-        kind="heuristic"
-      />
+      <div className="mt-3 flex flex-col gap-4">
+        {[...assessment.official_signals, ...assessment.heuristic_signals].map(
+          (signal) => (
+            <SignalCard key={signal.id} signal={signal} />
+          ),
+        )}
+      </div>
 
-      {assessment.warnings.length > 0 || unresolved.length > 0 || warnings.length > 0 ? (
+      {assessment.warnings.length > 0 ||
+      unresolved.length > 0 ||
+      warnings.length > 0 ? (
         <div>
           <h3 className="text-sm font-medium text-fg">Avisos</h3>
           <ul className="mt-2 flex flex-col gap-1.5 text-sm">
@@ -142,11 +145,15 @@ function AnalyzeResult({ response }: { response: AnalyzeResponse }) {
                 key={name}
                 className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-muted"
               >
-                Não encontramos &quot;{name}&quot; no banco local — carta excluída da análise.
+                Não encontramos &quot;{name}&quot; no banco local — carta
+                excluída da análise.
               </li>
             ))}
             {warnings.map((note, i) => (
-              <li key={i} className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-muted">
+              <li
+                key={i}
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-muted"
+              >
                 {note}
               </li>
             ))}
@@ -155,14 +162,17 @@ function AnalyzeResult({ response }: { response: AnalyzeResponse }) {
       ) : null}
 
       <p className="text-xs text-muted">
-        engine {assessment.engine_version} · regras {assessment.rules_version} · dados{" "}
-        {assessment.data_version}
+        engine {assessment.engine_version} · regras {assessment.rules_version} ·
+        dados {assessment.data_version}
       </p>
     </div>
   );
 }
 
-const SIGNAL_LIST_STYLE: Record<"official" | "heuristic", { border: string; badge: string }> = {
+const SIGNAL_LIST_STYLE: Record<
+  "official" | "heuristic",
+  { border: string; badge: string }
+> = {
   official: {
     border: "border-accent-primary/40",
     badge: "border-accent-primary/50 bg-accent-primary/10 text-accent-primary",
@@ -173,53 +183,38 @@ const SIGNAL_LIST_STYLE: Record<"official" | "heuristic", { border: string; badg
   },
 };
 
-function SignalList({
-  title,
-  signals,
-  kind,
-}: {
-  title: string;
-  signals: Signal[];
-  kind: "official" | "heuristic";
-}) {
-  if (signals.length === 0) return null;
-  const style = SIGNAL_LIST_STYLE[kind];
-
-  return (
-    <div className={`rounded-xl border p-4 ${style.border}`}>
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium text-fg">{title}</h3>
-        <span
-          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${style.badge}`}
-        >
-          {kind === "official" ? "Regra oficial" : "Heurístico — não define o bracket sozinho"}
-        </span>
-      </div>
-      <div className="mt-3 flex flex-col gap-4">
-        {signals.map((signal) => (
-          <SignalCard key={signal.id} signal={signal} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /** Um sinal do bracket (GAME_CHANGER, FAST_MANA, TUTOR, INTERACTION, DECK_SPEED, ...):
  * nome amigável + explicação, e — quando o sinal tem cartas associadas — a grade de
  * imagens das cartas que contaram pra ele (mesmo padrão de `/como-funciona`: clique
  * na carta abre o preview em tela cheia via `CardImage`). DECK_SPEED é agregado (sem
  * `card_or_cards` por evidência), então não renderiza grade. */
 function SignalCard({ signal }: { signal: Signal }) {
-  const cardNames = [...new Set(signal.evidence.flatMap((e) => e.card_or_cards))];
+  const cardNames = [
+    ...new Set(signal.evidence.flatMap((e) => e.card_or_cards)),
+  ];
+  const style =
+    SIGNAL_LIST_STYLE[signal.source_type as "official" | "heuristic"];
 
   return (
     <div className="rounded-lg border border-white/10 p-3">
-      <p className="text-sm text-muted">
-        <span className="font-medium text-fg">
-          {SIGNAL_CATEGORY_LABEL_PT[signal.category] ?? signal.category}
-        </span>{" "}
-        ({STRENGTH_PT[signal.strength] ?? signal.strength}): {signal.explanation}
-      </p>
+      <div className="flex flex-row justify-between gap-2">
+        <div className="flex flex-col gap-1">
+          <p className="font-medium text-fg">
+            {SIGNAL_CATEGORY_LABEL_PT[signal.category] ?? signal.category}
+            <p className="text-sm text-muted">
+              ({STRENGTH_PT[signal.strength] ?? signal.strength}):{" "}
+              {signal.explanation}
+            </p>
+          </p>
+          <p className="text-sm text-muted">{signal.explanation}</p>
+        </div>
+
+        <span
+          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${style.badge}`}
+        >
+          {signal.source_type === "official" ? "Regra oficial" : "Heurístico"}
+        </span>
+      </div>
 
       {cardNames.length > 0 ? (
         <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-6">
