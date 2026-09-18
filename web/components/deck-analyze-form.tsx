@@ -99,7 +99,7 @@ function AnalyzeResult({ response }: { response: AnalyzeResponse }) {
             <span></span>
           )}
         </div>
-        <div className="flex flex-col gap-2 self-end">
+        <div className="flex flex-col gap-6 self-start">
           <BracketBadge tier={assessment.bracket} size="lg" />
           <div className="flex flex-col gap-2">
             <p className="text-sm text-muted">
@@ -205,7 +205,7 @@ function SignalCard({ signal }: { signal: Signal }) {
     <div className="rounded-lg bg-bg p-3">
       <div className="flex flex-row justify-between gap-2">
         <div className="flex flex-col gap-1">
-          <p className="text-lg font-semibold text-fg gap-1">
+          <p className="text-lg font-semibold text-fg flex flex-row gap-2">
             {SIGNAL_CATEGORY_LABEL_PT[signal.category] ?? signal.category}
             <span className="text-sm text-muted">
               ({STRENGTH_PT[signal.strength] ?? signal.strength})
@@ -215,7 +215,7 @@ function SignalCard({ signal }: { signal: Signal }) {
         </div>
 
         <span
-          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${style.badge}`}
+          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium h-fit ${style.badge}`}
         >
           {signal.source_type === "official" ? "Regra oficial" : "Heurístico"}
         </span>
