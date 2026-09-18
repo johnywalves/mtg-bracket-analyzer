@@ -42,7 +42,7 @@ export function DeckAnalyzeForm({ offline = false }: { offline?: boolean }) {
           placeholder={
             "1 Sol Ring\n1 Sauron, the Dark Lord\n1 Cyclonic Rift\n..."
           }
-          className="w-full rounded-lg border border-white/20 bg-bg p-3 text-sm text-fg placeholder:text-muted focus:border-accent-primary focus:outline-none"
+          className="w-full rounded-lg border bg-bg p-3 text-sm placeholder:text-muted focus:border-accent-primary focus:outline-none"
         />
         <button
           type="submit"
@@ -189,7 +189,8 @@ const SIGNAL_LIST_STYLE: Record<
   },
   data: {
     border: "border-accent-secondary/40",
-    badge: "border-accent-secondary/50 bg-accent-secondary/10 text-accent-secondary",
+    badge:
+      "border-accent-secondary/50 bg-accent-secondary/10 text-accent-secondary",
   },
 };
 
@@ -202,7 +203,8 @@ function SignalCard({ signal }: { signal: Signal }) {
   const cardNames = [
     ...new Set(signal.evidence.flatMap((e) => e.card_or_cards)),
   ];
-  const style = SIGNAL_LIST_STYLE[signal.source_type] ?? SIGNAL_LIST_STYLE.heuristic;
+  const style =
+    SIGNAL_LIST_STYLE[signal.source_type] ?? SIGNAL_LIST_STYLE.heuristic;
 
   return (
     <div className="rounded-lg bg-bg p-3">
@@ -210,11 +212,13 @@ function SignalCard({ signal }: { signal: Signal }) {
         <div className="flex flex-col gap-1">
           <p className="text-lg font-semibold text-fg flex flex-row gap-2">
             {SIGNAL_CATEGORY_LABEL_PT[signal.category] ?? signal.category}
-            <span className="text-sm text-muted">
-              ({STRENGTH_PT[signal.strength] ?? signal.strength})
-            </span>
           </p>
-          <p className="text-sm text-muted">{signal.explanation}</p>
+          <p className="text-sm text-muted">
+            <span className="text-fg">
+              {STRENGTH_PT[signal.strength] ?? signal.strength}
+            </span>
+            : {signal.explanation}
+          </p>
         </div>
 
         <span
