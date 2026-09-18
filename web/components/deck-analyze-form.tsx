@@ -194,17 +194,32 @@ const SIGNAL_LIST_STYLE: Record<
   },
 };
 
+/** Extrai o id da variante do Commander Spellbook a partir do id de evidência
+ * (`ev-combo-{combo.id}`, ver `bracket_signals.combo_signal` no backend), pra montar
+ * o link "ver no Spellbook". */
+function comboIdFromEvidenceId(evidenceId: string): string | null {
+  const m = /^ev-combo-(.+)$/.exec(evidenceId);
+  return m ? m[1] : null;
+}
+
+const COMBO_EVIDENCE_TYPES = new Set(["two_card_combo", "multi_card_combo"]);
+
 /** Um sinal do bracket (GAME_CHANGER, FAST_MANA, TUTOR, INTERACTION, DECK_SPEED, ...):
  * nome amigável + explicação, e — quando o sinal tem cartas associadas — a grade de
  * imagens das cartas que contaram pra ele (mesmo padrão de `/como-funciona`: clique
  * na carta abre o preview em tela cheia via `CardImage`). DECK_SPEED é agregado (sem
- * `card_or_cards` por evidência), então não renderiza grade. */
+ * `card_or_cards` por evidência), então não renderiza grade. Sinais de combo (fonte
+ * "data") trocam a grade genérica por uma lista com link direto pra cada combo no
+ * Commander Spellbook. */
 function SignalCard({ signal }: { signal: Signal }) {
   const cardNames = [
     ...new Set(signal.evidence.flatMap((e) => e.card_or_cards)),
   ];
   const style =
     SIGNAL_LIST_STYLE[signal.source_type] ?? SIGNAL_LIST_STYLE.heuristic;
+  const comboEvidence = signal.evidence.filter((e) =>
+    COMBO_EVIDENCE_TYPES.has(e.type),
+  );
 
   return (
     <div className="rounded-lg bg-bg p-3">
@@ -232,7 +247,32 @@ function SignalCard({ signal }: { signal: Signal }) {
         </span>
       </div>
 
-      {cardNames.length > 0 ? (
+      {comboEvidence.length > 0 ? (
+        <ul className="mt-3 flex flex-col gap-2">
+          {comboEvidence.map((e) => {
+            const comboId = comboIdFromEvidenceId(e.id);
+            return (
+              <li
+                key={e.id}
+                className="rounded-lg border border-white/10 px-3 py-2 text-sm text-muted"
+              >
+                <p className="text-fg">{e.card_or_cards.join(" + ")}</p>
+                <p className="mt-0.5">{e.description}</p>
+                {comboId ? (
+                  <a
+                    href={`https://commanderspellbook.com/combo/${comboId}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-block text-xs font-medium text-accent-primary hover:underline"
+                  >
+                    Ver no Commander Spellbook ↗
+                  </a>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      ) : cardNames.length > 0 ? (
         <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-6">
           {cardNames.map((name) => (
             <CardImage key={name} name={name} className="w-full" />
