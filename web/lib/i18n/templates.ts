@@ -54,9 +54,9 @@ const SPEED_PT: Record<string, string> = {
 /** Tradução dos níveis de força de um sinal (strength: low/medium/high), usado
  * na UI ao lado do nome da categoria, ex. "Game Changers (alto)". */
 export const STRENGTH_PT: Record<string, string> = {
-  low: "baixo",
-  medium: "médio",
-  high: "alto",
+  low: "Baixo",
+  medium: "Médio",
+  high: "Alto",
 };
 const EXTRA_TURN_KIND_PT: Record<string, string> = {
   "repeatable/chainable": "repetível/encadeável",
@@ -66,6 +66,59 @@ const TUTOR_KIND_PT: Record<string, string> = {
   narrow: "estreita",
   broad: "ampla",
 };
+
+/**
+ * Nomes de "feature"/resultado do Commander Spellbook (campo `produces` em
+ * backend/mtg_analyzer/models/combo.py, texto cru da API externa — o backend não traduz).
+ * Cobre só os termos conhecidos vistos na prática; um termo sem entrada aqui é devolvido
+ * como veio da API (inglês) e loga aviso via `translateFeatureName`.
+ */
+const FEATURE_NAME_PT: Record<string, string> = {
+  "Target opponent loses the game": "Oponente alvo perde o jogo",
+  "Each opponent loses the game": "Cada oponente perde o jogo",
+  "Infinite lifeloss for target opponent": "Perda de vida infinita para oponente alvo",
+  "Near-infinite lifeloss for target opponent":
+    "Perda de vida quase infinita para oponente alvo",
+  "Infinite lifeloss": "Perda de vida infinita",
+  "Infinite card draw": "Compra infinita de cartas",
+  "Infinite draw triggers": "Gatilhos infinitos de compra",
+  "Infinite creature ETB": "Entradas infinitas de criaturas no campo de batalha",
+  "Infinite creature LTB": "Saídas infinitas de criaturas do campo de batalha",
+  "Infinite creature sacrifice triggers": "Gatilhos infinitos de sacrifício de criatura",
+  "Infinite death triggers": "Gatilhos infinitos de morte",
+  "Infinite creature tokens with haste": "Fichas infinitas de criatura com ímpeto",
+  "Infinite untap of creatures you control":
+    "Desvirar infinito das criaturas que você controla",
+  "Infinite mana creatures you control can produce":
+    "Mana infinito que suas criaturas podem produzir",
+  "Near-infinite combat damage": "Dano de combate quase infinito",
+  "Near-infinite combat phases": "Fases de combate quase infinitas",
+  "Near-infinite creature tokens with haste": "Fichas quase infinitas de criatura com ímpeto",
+  "Near-infinite death triggers": "Gatilhos quase infinitos de morte",
+  "Near-infinite creature ETB": "Entradas quase infinitas de criaturas no campo de batalha",
+  "Near-infinite creature LTB": "Saídas quase infinitas de criaturas do campo de batalha",
+  "Near-infinite creature sacrifice triggers":
+    "Gatilhos quase infinitos de sacrifício de criatura",
+  "Near-infinite mana creatures you control can produce":
+    "Mana quase infinito que suas criaturas podem produzir",
+  "Near-infinite untap of creatures you control":
+    "Desvirar quase infinito das criaturas que você controla",
+};
+
+/** Traduz a lista de "produces" de um combo (ex. "Infinite lifeloss, Target opponent loses
+ * the game"), termo a termo; termos desconhecidos ficam em inglês e um aviso é logado. */
+function translateProduces(produces: string): string {
+  if (!produces) return produces;
+  return produces
+    .split(", ")
+    .map((term) => {
+      const translated = FEATURE_NAME_PT[term];
+      if (translated) return translated;
+      console.warn(`[i18n] Sem tradução para termo de combo: ${JSON.stringify(term)}`);
+      return term;
+    })
+    .join(", ");
+}
 
 export const TEMPLATES: TranslationTemplate[] = [
   // --- bracket_signals.py: GAME_CHANGER -------------------------------------------------
@@ -86,7 +139,7 @@ export const TEMPLATES: TranslationTemplate[] = [
     pattern:
       /^(.+) form a combo \(([^)]*)\)((?: \(both pieces cheap\/early, mana value ≤ 3 — heuristic threshold\))?)\.$/,
     render: ([names, produces, cheapNote]) =>
-      `${names} formam um combo (${produces})` +
+      `${names} formam um combo (${translateProduces(produces)})` +
       (cheapNote
         ? " (ambas as peças baratas/rápidas, valor de mana ≤ 3, limiar heurístico)"
         : "") +

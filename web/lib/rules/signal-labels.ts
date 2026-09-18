@@ -11,6 +11,8 @@ export const SIGNAL_CATEGORY_LABEL_PT: Record<string, string> = {
   INTERACTION: "Interação",
   DECK_SPEED: "Velocidade do deck",
   COMBO: "Combos",
+  TWO_CARD_COMBO: "Combo de duas peças",
+  MULTI_CARD_COMBO: "Combo de múltiplas peças",
   EXTRA_TURN: "Turnos extras",
   MASS_LAND_DENIAL: "Negação massiva de terrenos",
 };

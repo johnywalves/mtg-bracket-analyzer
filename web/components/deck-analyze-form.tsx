@@ -228,11 +228,11 @@ function SignalCard({ signal }: { signal: Signal }) {
           <p className="text-lg font-semibold text-fg flex flex-row gap-2">
             {SIGNAL_CATEGORY_LABEL_PT[signal.category] ?? signal.category}
           </p>
-          <p className="text-sm text-muted">
-            <span className="text-fg">
-              {STRENGTH_PT[signal.strength] ?? signal.strength}
-            </span>
-            : {signal.explanation}
+          <p className="text-sm text-muted leading-relaxed">
+            <span className="text-fg font-medium">
+              {STRENGTH_PT[signal.strength] ?? signal.strength}:
+            </span>{" "}
+            {signal.explanation}
           </p>
         </div>
 
