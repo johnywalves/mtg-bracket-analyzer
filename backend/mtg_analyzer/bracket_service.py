@@ -23,6 +23,7 @@ from mtg_analyzer.analysis.engine import (
     Ruleset,
     load_latest_ruleset,
 )
+from mtg_analyzer.combos.client import CommanderSpellbookClient
 from mtg_analyzer.combos.store import ComboStore
 from mtg_analyzer.data.db import CardDatabase
 from mtg_analyzer.data.scryfall_client import ScryfallClient
@@ -210,11 +211,28 @@ class BracketService:
 
         combo_store = self._open_combo_store()
         try:
+            main_names = [e.card.name for e in resolved.mainboard if e.card]
+            commander_names = [e.card.name for e in resolved.commanders if e.card]
+
+            async def run_combos() -> None:
+                async with CommanderSpellbookClient() as client:
+                    live = await client.find_my_combos(main=main_names, commanders=commander_names)
+                if live and live.included:
+                    combo_store.add(live.included)
+
+            try:
+                asyncio.run(run_combos())
+            except Exception as exc:  # noqa: BLE001 — best-effort; offline cache still works
+                self.notes.append(
+                    f"Live combo lookup unavailable — {type(exc).__name__} "
+                    "(offline or rate-limited); using cached combo data only.")
+
             context = AnalysisContext(ruleset=self.ruleset, data_version="local",
                                        combo_store=combo_store)
             assessment = BracketEngine(context).analyze(deck)
         finally:
             combo_store.close()
+        assessment.commanders = commander_names
         markdown = render_markdown(assessment, deck, unresolved)
         return BracketReport(deck=resolved, assessment=assessment, unresolved=unresolved,
                              markdown=markdown)

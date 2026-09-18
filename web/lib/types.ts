@@ -121,6 +121,7 @@ export interface BracketAssessment {
   minimum_bracket: number;
   maximum_bracket: number;
   confidence: Confidence;
+  commanders: string[];
   official_signals: Signal[];
   heuristic_signals: Signal[];
   evidence: Evidence[];

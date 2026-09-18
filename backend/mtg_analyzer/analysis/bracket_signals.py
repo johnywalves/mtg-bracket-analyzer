@@ -314,7 +314,9 @@ def interaction_signal(deck: Deck, ruleset) -> Signal | None:  # type: ignore[no
         source_type="heuristic",
         strength="high" if density >= 0.15 else "medium" if density >= 0.08 else "low",
         evidence=evidence,
-        explanation=f"{len(evidence)} interaction piece(s) ({summary}), {density:.0%} density.",
+        explanation=f"{len(evidence)} interaction piece(s) ({summary}), {density:.0%} density. "
+                    "High interaction density is expected at brackets 4-5; very low interaction "
+                    "typically points to lower brackets.",
     )
 
 
@@ -354,5 +356,6 @@ def deck_speed_signal(deck: Deck, ruleset, fast_mana_count: int, tutor_density: 
                         f"combo {'present' if has_combo else 'absent'} → {speed} deck speed.",
             impact="low",
         )],
-        explanation=f"Estimated deck speed: {speed}.",
+        explanation=f"Estimated deck speed: {speed} "
+                    "(context signal only — does not by itself set the bracket).",
     )
