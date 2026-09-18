@@ -103,6 +103,59 @@ const FEATURE_NAME_PT: Record<string, string> = {
     "Mana quase infinito que suas criaturas podem produzir",
   "Near-infinite untap of creatures you control":
     "Desvirar quase infinito das criaturas que você controla",
+  "Infinite colored mana": "Mana colorido infinito",
+  "Infinite colorless mana": "Mana incolor infinito",
+  "Infinite red mana": "Mana vermelho infinito",
+  "Infinite green mana": "Mana verde infinito",
+  "Infinite planeswalker activations": "Ativações infinitas de planeswalker",
+  "Infinite activations of most planeswalkers":
+    "Ativações infinitas da maioria dos planeswalkers",
+  "Infinite turns": "Turnos infinitos",
+  "Infinite damage": "Dano infinito",
+  "Infinite lifegain": "Ganho de vida infinito",
+  "Infinite lifegain triggers": "Gatilhos infinitos de ganho de vida",
+  "Infinite mana permanents you control can produce":
+    "Mana infinito que seus permanentes podem produzir",
+  "Infinite mana enchanted permanents you control can produce":
+    "Mana infinito que seus permanentes encantados podem produzir",
+  "Infinite mana artifacts you control can produce":
+    "Mana infinito que seus artefatos podem produzir",
+  "Infinite mana lands you control can produce":
+    "Mana infinito que seus terrenos podem produzir",
+  "Infinite mana permanents you control that enter the battlefield untapped can produce":
+    "Mana infinito que seus permanentes que entram destravados podem produzir",
+  "Infinite untap of artifacts you control": "Desvirar infinito dos artefatos que você controla",
+  "Infinite untap of lands you control": "Desvirar infinito dos terrenos que você controla",
+  "Infinite untap of creatures and lands you control":
+    "Desvirar infinito das criaturas e terrenos que você controla",
+  "Infinite creature tokens": "Fichas infinitas de criatura",
+  "Near-infinite creature tokens": "Fichas quase infinitas de criatura",
+  "Infinite copies of a specific planeswalker": "Cópias infinitas de um planeswalker específico",
+  "Infinite copies of legendary permanents you own in play until end of turn":
+    "Cópias infinitas dos permanentes lendários que você possui em jogo até o final do turno",
+  "Infinite blinking of permanents": "Piscar infinito de permanentes",
+  "Infinite commander casts": "Conjurações infinitas do comandante",
+  "Infinite storm count": "Contagem de Tempestade infinita",
+  "Near-infinite storm count": "Contagem de Tempestade quase infinita",
+  "Infinite landfall triggers": "Gatilhos infinitos de Chegada em Campo",
+  "Near-infinite landfall triggers": "Gatilhos quase infinitos de Chegada em Campo",
+  "Near-infinite magecraft triggers": "Gatilhos quase infinitos de Feitiçaria",
+  "Near-infinite casts of instants and sorceries in your opponents' graveyards":
+    "Conjurações quase infinitas de mágicas instantâneas e feitiços dos cemitérios dos oponentes",
+  "Cast all permanent cards in your graveyard":
+    "Conjurar todas as cartas de permanente do seu cemitério",
+  "Put all artifact cards from your library onto the battlefield":
+    "Colocar todas as cartas de artefato da sua biblioteca no campo de batalha",
+  "Put all creature cards from your library onto the battlefield":
+    "Colocar todas as cartas de criatura da sua biblioteca no campo de batalha",
+  "Put all lands from your library onto the battlefield":
+    "Colocar todos os terrenos da sua biblioteca no campo de batalha",
+  "Exile your library": "Exilar sua biblioteca",
+  "Exile all permanents opponents control": "Exilar todos os permanentes que os oponentes controlam",
+  "Mass Land Denial": "Negação massiva de terrenos",
+  "Opponents can't cast instant spells during their turns":
+    "Oponentes não podem conjurar mágicas instantâneas durante os turnos deles",
+  "Opponents can't cast sorcery spells": "Oponentes não podem conjurar feitiços",
 };
 
 /** Traduz a lista de "produces" de um combo (ex. "Infinite lifeloss, Target opponent loses
