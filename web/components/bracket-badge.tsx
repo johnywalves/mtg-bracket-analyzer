@@ -36,7 +36,7 @@ export function BracketBadge({
   if (size === "lg") {
     return (
       <div
-        className={`flex items-center justify-center gap-3 rounded-xl border px-4 py-2 ${style} ${className}`}
+        className={`flex items-center justify-center gap-3 rounded-xl border h-fit px-4 py-2 ${style} ${className}`}
       >
         <span className="text-3xl font-bold leading-none">{tier}</span>
         <div className="leading-tight">

@@ -76,42 +76,48 @@ function AnalyzeResult({ response }: { response: AnalyzeResponse }) {
 
   return (
     <div className="mt-6 flex flex-col gap-5 border-t border-white/10 pt-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,200px)_1fr]">
-        {assessment.commanders.length > 0 ? (
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
-              Comandante{assessment.commanders.length > 1 ? "s" : ""}
-            </p>
-            <div
-              className={
-                assessment.commanders.length > 1 ? "grid grid-cols-2 gap-3" : ""
-              }
-            >
-              {assessment.commanders.map((name) => (
-                <CardImage key={name} name={name} className="w-full" />
-              ))}
+      <div className="flex flex-row justify-between gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,160px)_1fr]">
+          {assessment.commanders.length > 0 ? (
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide">
+                Comandante{assessment.commanders.length > 1 ? "s" : ""}
+              </p>
+              <div
+                className={
+                  assessment.commanders.length > 1
+                    ? "grid grid-cols-2 gap-3"
+                    : ""
+                }
+              >
+                {assessment.commanders.map((name) => (
+                  <CardImage key={name} name={name} className="w-full" />
+                ))}
+              </div>
             </div>
-          </div>
-        ) : (
-          <span></span>
-        )}
-        <div className="flex flex-col gap-2 self-start">
+          ) : (
+            <span></span>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 self-end">
           <BracketBadge tier={assessment.bracket} size="lg" />
-          <p className="text-sm text-muted">
-            Faixa provável: {assessment.minimum_bracket}–
-            {assessment.maximum_bracket} · Confiança:{" "}
-            <span className="font-medium text-fg">
-              {CONFIDENCE_LABEL[assessment.confidence.level] ??
-                assessment.confidence.level}
-            </span>
-          </p>
-          {assessment.confidence.reasons.length > 0 ? (
-            <ul className="list-inside list-disc text-xs text-muted">
-              {assessment.confidence.reasons.map((reason) => (
-                <li key={reason}>{reason}</li>
-              ))}
-            </ul>
-          ) : null}
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-muted">
+              Faixa provável: {assessment.minimum_bracket}–
+              {assessment.maximum_bracket} · Confiança:{" "}
+              <span className="font-medium text-fg">
+                {CONFIDENCE_LABEL[assessment.confidence.level] ??
+                  assessment.confidence.level}
+              </span>
+            </p>
+            {assessment.confidence.reasons.length > 0 ? (
+              <ul className="list-inside list-disc text-xs text-muted">
+                {assessment.confidence.reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -196,15 +202,14 @@ function SignalCard({ signal }: { signal: Signal }) {
     SIGNAL_LIST_STYLE[signal.source_type as "official" | "heuristic"];
 
   return (
-    <div className="rounded-lg border border-white/10 p-3">
+    <div className="rounded-lg bg-bg p-3">
       <div className="flex flex-row justify-between gap-2">
         <div className="flex flex-col gap-1">
-          <p className="font-medium text-fg">
+          <p className="text-lg font-semibold text-fg gap-1">
             {SIGNAL_CATEGORY_LABEL_PT[signal.category] ?? signal.category}
-            <p className="text-sm text-muted">
-              ({STRENGTH_PT[signal.strength] ?? signal.strength}):{" "}
-              {signal.explanation}
-            </p>
+            <span className="text-sm text-muted">
+              ({STRENGTH_PT[signal.strength] ?? signal.strength})
+            </span>
           </p>
           <p className="text-sm text-muted">{signal.explanation}</p>
         </div>
