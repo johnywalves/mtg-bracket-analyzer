@@ -252,3 +252,75 @@ def test_live_fill_skips_network_call_when_nothing_unresolved(
         assert svc.notes == []
     finally:
         db.close()
+
+
+class _FakeComboClient:
+    """Stands in for `CommanderSpellbookClient` — no network, just echoes back what the
+    test wired up. `included=None` simulates a deck with no combos; raising on construction
+    simulates network failure."""
+
+    def __init__(self, included: list | None = None) -> None:
+        self._included = included
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        return None
+
+    async def find_my_combos(self, main, commanders=()):
+        if self._included is None:
+            raise ConnectionError("offline")
+        from mtg_analyzer.combos.store import DeckCombos
+        return DeckCombos(identity="", included=self._included, almost_included=[],
+                          included_by_changing_commanders=[],
+                          almost_included_by_adding_colors=[])
+
+
+def _commander_decklist() -> str:
+    return "1 Sol Ring\n1 Sol Ring, Dark Lord\n"
+
+
+def test_analyze_decklist_populates_commanders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = CardDatabase(tmp_path / "test.db")
+    try:
+        sol_ring = make_card("Sol Ring", oracle_id="or1", colors=[], color_identity=[])
+        sauron = make_card("Sauron, the Dark Lord", oracle_id="or2",
+                           colors=["U", "B", "R"], color_identity=["U", "B", "R"],
+                           type_line="Legendary Creature")
+        db.upsert_card(sol_ring)
+        db.upsert_card(sauron)
+        monkeypatch.setattr(
+            "mtg_analyzer.bracket_service.CommanderSpellbookClient",
+            lambda *a, **kw: _FakeComboClient(included=[]),
+        )
+        svc = BracketService(db=db)
+
+        report = svc.analyze_decklist("1 Sauron, the Dark Lord\n1 Sol Ring\n")
+
+        assert "Sauron, the Dark Lord" in report.assessment.commanders
+    finally:
+        db.close()
+
+
+def test_analyze_decklist_combo_lookup_failure_is_graceful(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = CardDatabase(tmp_path / "test.db")
+    try:
+        sol_ring = make_card("Sol Ring", oracle_id="or1")
+        db.upsert_card(sol_ring)
+        monkeypatch.setattr(
+            "mtg_analyzer.bracket_service.CommanderSpellbookClient",
+            lambda *a, **kw: _FakeComboClient(included=None),  # raises on find_my_combos
+        )
+        svc = BracketService(db=db)
+
+        report = svc.analyze_decklist("1 Sol Ring\n")  # must not raise
+
+        assert report.assessment is not None
+        assert any("combo lookup unavailable" in n for n in svc.notes)
+    finally:
+        db.close()

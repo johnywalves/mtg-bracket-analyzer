@@ -3,9 +3,12 @@ import { translateString } from "@/lib/i18n/templates";
 
 /**
  * Traduz pra PT-BR só o texto livre de uma `AnalyzeResponse` — nunca os campos
- * "enum-like" (category/strength/source_type/severity/code/bracket_name), nem nomes de
+ * "enum-like" (category/source_type/severity/code/bracket_name), nem nomes de
  * carta (`unresolved`, `card_or_cards`). O backend (`bracket_service.py` /
  * `analysis/*.py`) fica 100% em inglês; ver o comentário no topo de `templates.ts`.
+ *
+ * `strength` segue enum-like no dado, mas é traduzido na hora de renderizar na UI
+ * (ver `STRENGTH_PT` em `templates.ts`, usado por `deck-analyze-form.tsx`).
  *
  * Pura: devolve uma cópia, não muta `response`.
  */

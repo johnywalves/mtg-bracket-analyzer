@@ -70,6 +70,7 @@ class BracketAssessment(BaseModel):
     maximum_bracket: int
     confidence: Confidence
 
+    commanders: list[str] = Field(default_factory=list)
     official_signals: list[Signal] = Field(default_factory=list)
     heuristic_signals: list[Signal] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)

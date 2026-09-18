@@ -44,6 +44,9 @@ function translateInteractionSummary(summary: string): string {
 
 const PRESENT_ABSENT_PT: Record<string, string> = { present: "presente", absent: "ausente" };
 const SPEED_PT: Record<string, string> = { low: "baixa", medium: "média", high: "alta" };
+/** Tradução dos níveis de força de um sinal (strength: low/medium/high) — usado
+ * na UI ao lado do nome da categoria, ex. "Game Changers (alto)". */
+export const STRENGTH_PT: Record<string, string> = { low: "baixo", medium: "médio", high: "alto" };
 const EXTRA_TURN_KIND_PT: Record<string, string> = {
   "repeatable/chainable": "repetível/encadeável",
   "one-shot spell": "feitiço único",
@@ -152,9 +155,12 @@ export const TEMPLATES: TranslationTemplate[] = [
   },
   {
     name: "interaction.explanation",
-    pattern: /^(\d+) interaction piece\(s\) \((.+)\), (\d+)% density\.$/,
+    pattern:
+      /^(\d+) interaction piece\(s\) \((.+)\), (\d+)% density\. High interaction density is expected at brackets 4-5; very low interaction typically points to lower brackets\.$/,
     render: ([n, summary, pct]) =>
-      `${n} peça(s) de interação (${translateInteractionSummary(summary)}), densidade de ${pct}%.`,
+      `${n} peça(s) de interação (${translateInteractionSummary(summary)}), densidade de ${pct}%. ` +
+      "Alta densidade de interação é esperada em brackets 4-5; interação muito baixa " +
+      "costuma apontar pra brackets menores.",
   },
 
   // --- bracket_signals.py: DECK_SPEED ------------------------------------------------------
@@ -169,8 +175,11 @@ export const TEMPLATES: TranslationTemplate[] = [
   },
   {
     name: "deck_speed.explanation",
-    pattern: /^Estimated deck speed: (low|medium|high)\.$/,
-    render: ([speed]) => `Velocidade de deck estimada: ${SPEED_PT[speed] ?? speed}.`,
+    pattern:
+      /^Estimated deck speed: (low|medium|high) \(context signal only — does not by itself set the bracket\)\.$/,
+    render: ([speed]) =>
+      `Velocidade de deck estimada: ${SPEED_PT[speed] ?? speed} ` +
+      "(sinal de contexto apenas — não define o bracket sozinho).",
   },
 
   // --- engine.py: validation warnings -------------------------------------------------------
@@ -238,6 +247,14 @@ export const TEMPLATES: TranslationTemplate[] = [
     render: ([n, cap]) =>
       `${n} carta(s) não resolvida(s) adicional(is) não passou(passaram) pelo fallback de ` +
       `resolução individual ao vivo (limite: ${cap} por requisição).`,
+  },
+  {
+    name: "note.live_combo_unavailable",
+    pattern:
+      /^Live combo lookup unavailable — (.+) \(offline or rate-limited\); using cached combo data only\.$/,
+    render: ([excType]) =>
+      `Consulta de combos ao vivo indisponível — ${excType} (offline ou limite de taxa); ` +
+      "usando apenas dados de combo em cache.",
   },
 ];
 

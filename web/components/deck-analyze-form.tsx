@@ -8,6 +8,7 @@ import { BracketBadge } from "@/components/bracket-badge";
 import { CardImage } from "@/components/card-image";
 import { Panel } from "@/components/panel";
 import { SIGNAL_CATEGORY_LABEL_PT } from "@/lib/rules/signal-labels";
+import { STRENGTH_PT } from "@/lib/i18n/templates";
 import type { AnalyzeResponse, Signal } from "@/lib/types";
 
 const CONFIDENCE_LABEL: Record<string, string> = {
@@ -70,18 +71,38 @@ function AnalyzeResult({ response }: { response: AnalyzeResponse }) {
 
   return (
     <div className="mt-6 flex flex-col gap-5 border-t border-white/10 pt-6">
-      <div className="flex flex-wrap items-center gap-4">
-        <BracketBadge tier={assessment.bracket} size="lg" />
-        <div>
-          <p className="text-sm text-muted">
-            Faixa provável: {assessment.minimum_bracket}–{assessment.maximum_bracket} ·
-            Confiança:{" "}
-            <span className="font-medium text-fg">
-              {CONFIDENCE_LABEL[assessment.confidence.level] ?? assessment.confidence.level}
-            </span>
-          </p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,200px)_1fr]">
+        {assessment.commanders.length > 0 ? (
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+              Comandante{assessment.commanders.length > 1 ? "s" : ""}
+            </p>
+            <div
+              className={
+                assessment.commanders.length > 1
+                  ? "grid grid-cols-2 gap-3"
+                  : ""
+              }
+            >
+              {assessment.commanders.map((name) => (
+                <CardImage key={name} name={name} className="w-full" />
+              ))}
+            </div>
+          </div>
+        ) : null}
+        <div className="flex flex-col gap-2 self-start">
+          <div className="flex flex-wrap items-center gap-4">
+            <BracketBadge tier={assessment.bracket} size="lg" />
+            <p className="text-sm text-muted">
+              Faixa provável: {assessment.minimum_bracket}–{assessment.maximum_bracket} ·
+              Confiança:{" "}
+              <span className="font-medium text-fg">
+                {CONFIDENCE_LABEL[assessment.confidence.level] ?? assessment.confidence.level}
+              </span>
+            </p>
+          </div>
           {assessment.confidence.reasons.length > 0 ? (
-            <ul className="mt-1 list-inside list-disc text-xs text-muted">
+            <ul className="list-inside list-disc text-xs text-muted">
               {assessment.confidence.reasons.map((reason) => (
                 <li key={reason}>{reason}</li>
               ))}
@@ -90,8 +111,16 @@ function AnalyzeResult({ response }: { response: AnalyzeResponse }) {
         </div>
       </div>
 
-      <SignalList title="Sinais oficiais" signals={assessment.official_signals} />
-      <SignalList title="Sinais heurísticos" signals={assessment.heuristic_signals} />
+      <SignalList
+        title="Sinais oficiais"
+        signals={assessment.official_signals}
+        kind="official"
+      />
+      <SignalList
+        title="Sinais heurísticos"
+        signals={assessment.heuristic_signals}
+        kind="heuristic"
+      />
 
       {assessment.warnings.length > 0 || unresolved.length > 0 || warnings.length > 0 ? (
         <div>
@@ -133,13 +162,40 @@ function AnalyzeResult({ response }: { response: AnalyzeResponse }) {
   );
 }
 
-function SignalList({ title, signals }: { title: string; signals: Signal[] }) {
+const SIGNAL_LIST_STYLE: Record<"official" | "heuristic", { border: string; badge: string }> = {
+  official: {
+    border: "border-accent-primary/40",
+    badge: "border-accent-primary/50 bg-accent-primary/10 text-accent-primary",
+  },
+  heuristic: {
+    border: "border-white/15",
+    badge: "border-white/20 bg-white/5 text-muted",
+  },
+};
+
+function SignalList({
+  title,
+  signals,
+  kind,
+}: {
+  title: string;
+  signals: Signal[];
+  kind: "official" | "heuristic";
+}) {
   if (signals.length === 0) return null;
+  const style = SIGNAL_LIST_STYLE[kind];
 
   return (
-    <div>
-      <h3 className="text-sm font-medium text-fg">{title}</h3>
-      <div className="mt-2 flex flex-col gap-4">
+    <div className={`rounded-xl border p-4 ${style.border}`}>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-medium text-fg">{title}</h3>
+        <span
+          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${style.badge}`}
+        >
+          {kind === "official" ? "Regra oficial" : "Heurístico — não define o bracket sozinho"}
+        </span>
+      </div>
+      <div className="mt-3 flex flex-col gap-4">
         {signals.map((signal) => (
           <SignalCard key={signal.id} signal={signal} />
         ))}
@@ -162,16 +218,13 @@ function SignalCard({ signal }: { signal: Signal }) {
         <span className="font-medium text-fg">
           {SIGNAL_CATEGORY_LABEL_PT[signal.category] ?? signal.category}
         </span>{" "}
-        ({signal.strength}): {signal.explanation}
+        ({STRENGTH_PT[signal.strength] ?? signal.strength}): {signal.explanation}
       </p>
 
       {cardNames.length > 0 ? (
-        <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-6">
           {cardNames.map((name) => (
-            <figure key={name}>
-              <CardImage name={name} />
-              <figcaption className="mt-1.5 text-xs text-muted">{name}</figcaption>
-            </figure>
+            <CardImage key={name} name={name} className="w-full" />
           ))}
         </div>
       ) : null}
