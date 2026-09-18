@@ -24,6 +24,16 @@
 - **Simulator (Phase 9):** essentially landed (LOTR rank-distance 0). Remaining is optional polish —
   Stage 2's full IS-MCTS only if "skillful-timing realism" becomes a goal; simplify near-inert politics
   knobs; opportunistic anchor-gated corpus fit (X2).
+- **2026 precons registered (2026-09-18):** all 12 Commander precons released in 2026 through today are
+  saved in the local deck library (`data/decks/`, via `mtg deck save`) — Lorwyn Eclipsed Commander
+  (*Dance of the Elements*, *Blight Curse*), Teenage Mutant Ninja Turtles Eternal (*Turtle Power!*),
+  Secrets of Strixhaven Commander (*Lorehold Spirit*, *Prismari Artistry*, *Quandrix Unlimited*,
+  *Witherbloom Pestilence*, *Silverquill Influence*), Marvel Super Heroes Commander (*Avengers Assemble*,
+  *The Fantastic Four*, *Wakanda Forever*, *Doom Prevails*). All 12 resolve 100/100 cards with 0
+  unresolved against the local Scryfall DB (`mtg deck show`). No new code — reused the existing generic
+  decklist pipeline; there's no precon-specific data model, so provenance (product/set/date) is a `//`
+  comment in each `.txt`. *The Hobbit* (Aug 2026) and *The Zeta Set* (Sep 2026) shipped without
+  traditional EDH precons and were excluded.
 
 ## 1. Vision
 
