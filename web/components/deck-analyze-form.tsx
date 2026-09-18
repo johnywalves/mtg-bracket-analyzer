@@ -176,7 +176,7 @@ function AnalyzeResult({ response }: { response: AnalyzeResponse }) {
 }
 
 const SIGNAL_LIST_STYLE: Record<
-  "official" | "heuristic",
+  "official" | "heuristic" | "data",
   { border: string; badge: string }
 > = {
   official: {
@@ -186,6 +186,10 @@ const SIGNAL_LIST_STYLE: Record<
   heuristic: {
     border: "border-white/15",
     badge: "border-white/20 bg-white/5 text-muted",
+  },
+  data: {
+    border: "border-accent-secondary/40",
+    badge: "border-accent-secondary/50 bg-accent-secondary/10 text-accent-secondary",
   },
 };
 
@@ -198,8 +202,7 @@ function SignalCard({ signal }: { signal: Signal }) {
   const cardNames = [
     ...new Set(signal.evidence.flatMap((e) => e.card_or_cards)),
   ];
-  const style =
-    SIGNAL_LIST_STYLE[signal.source_type as "official" | "heuristic"];
+  const style = SIGNAL_LIST_STYLE[signal.source_type] ?? SIGNAL_LIST_STYLE.heuristic;
 
   return (
     <div className="rounded-lg bg-bg p-3">
@@ -217,7 +220,11 @@ function SignalCard({ signal }: { signal: Signal }) {
         <span
           className={`rounded-full border px-2 py-0.5 text-[11px] font-medium h-fit ${style.badge}`}
         >
-          {signal.source_type === "official" ? "Regra oficial" : "Heurístico"}
+          {signal.source_type === "official"
+            ? "Regra oficial"
+            : signal.source_type === "data"
+              ? "Dados"
+              : "Heurístico"}
         </span>
       </div>
 

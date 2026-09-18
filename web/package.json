@@ -7,7 +7,8 @@
     "dev": "next dev -p 5500",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest"
   },
   "dependencies": {
     "js-yaml": "^5.4.2",
@@ -19,13 +20,17 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@tailwindcss/postcss": "^4.0.0",
+    "@testing-library/react": "^16.2.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.10.7",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^4.3.4",
     "eslint": "^9.19.0",
     "eslint-config-next": "^15.1.6",
+    "jsdom": "^25.0.1",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.4"
   }
 }
