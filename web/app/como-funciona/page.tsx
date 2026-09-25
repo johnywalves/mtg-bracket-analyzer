@@ -104,8 +104,8 @@ const SOURCES: { label: string; href: string; note: string }[] = [
     note: "Classificação de bracket que o próprio Commander Spellbook atribui a cada combo, usada pra estimar a força de um combo encontrado no deck.",
   },
   {
-    label: "EpicEDH: Commander Deck Building Template",
-    href: "https://epicedh.com/commander-deck-building-template/",
+    label: "The Command Zone: Commander Deckbuilding Template",
+    href: "https://www.youtube.com/watch?v=OSNV6224cHg",
     note: "Base de métricas heurísticas para curvas e limites percentuais (ex: meta de 15% de interação).",
   },
 ];
@@ -280,7 +280,7 @@ export default function ComoFuncionaPage() {
             </p>
             <ul className="mt-3 list-disc pl-5 space-y-2 text-sm text-muted">
               <li>
-                <strong className="text-fg font-medium">Interação Alta (≥ 15%):</strong> Baseada nos templates clássicos da comunidade (como <em>The Command Zone</em> e <em>EpicEDH</em>), que recomendam 10 peças de interação (remoção, proteção, anulações) para rodar de forma eficiente. Em um deck padrão de 65 cartas não-terreno, 10 peças equivalem a cerca de 15%.
+                <strong className="text-fg font-medium">Interação Alta (≥ 15%):</strong> Baseada nos templates clássicos da comunidade (como <em>The Command Zone</em>), que recomendam 10 peças de interação (remoção, proteção, anulações) para rodar de forma eficiente. Em um deck padrão de 65 cartas não-terreno, 10 peças equivalem a cerca de 15%.
               </li>
               <li>
                 <strong className="text-fg font-medium">Mana Rápida Curada (≥ 2 peças):</strong> Presença de 2 ou mais aceleradores explosivos de uma lista curada (como Sol Ring, Mana Crypt, Mox Diamond, etc), indicando vantagem explosiva de curva nos primeiros turnos.
