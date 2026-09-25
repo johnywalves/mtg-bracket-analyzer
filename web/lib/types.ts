@@ -51,6 +51,7 @@ export interface DeckReport {
   combos: string[];
   bracket_estimate: number; // 1–5
   bracket_rationale: string;
+  bracket_import?: number | null;
   cards: DeckCardEntry[];
 }
 

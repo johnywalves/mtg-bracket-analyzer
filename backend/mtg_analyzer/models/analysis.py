@@ -36,3 +36,4 @@ class DeckReport(BaseModel):
     combos: list[str]  # combos present in the deck (e.g. "Infinite mana — A + B")
     bracket_estimate: int  # 1–5
     bracket_rationale: str
+    bracket_import: int | None = None
