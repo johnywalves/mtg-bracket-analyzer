@@ -103,6 +103,11 @@ const SOURCES: { label: string; href: string; note: string }[] = [
     href: "https://commanderspellbook.com/syntax-guide/#bracket",
     note: "Classificação de bracket que o próprio Commander Spellbook atribui a cada combo, usada pra estimar a força de um combo encontrado no deck.",
   },
+  {
+    label: "EpicEDH: Commander Deck Building Template",
+    href: "https://epicedh.com/commander-deck-building-template/",
+    note: "Base de métricas heurísticas para curvas e limites percentuais (ex: meta de 15% de interação).",
+  },
 ];
 
 function CardNameList({ names }: { names: string[] }) {
@@ -271,9 +276,22 @@ export default function ComoFuncionaPage() {
               (como a aceleração de mana muito acima da curva normal, ex.: <CardNameList names={["Sol Ring", "Mana Crypt", "Ancient Tomb"]} />).
               <br/><strong className="text-fg mt-1 block">Regras de Teto e Ajuste:</strong> 
               O teto é sempre pelo menos o bracket 3, ou piso + 1 quando o piso já passou de 2 (limitado ao bracket 5).
-              Com pelo menos 2 cartas de mana rápida curada, um tutor amplo ou densidade alta de 
-              interação (≥15% das cartas não-terreno), a estimativa final sobe 1 bracket acima do piso, 
-              sem nunca ultrapassar o teto calculado.
+              A estimativa final sobe 1 bracket acima do piso (sem nunca ultrapassar o teto) se atingir pelo menos <strong>um</strong> dos seguintes gatilhos heurísticos de consistência:
+            </p>
+            <ul className="mt-3 list-disc pl-5 space-y-2 text-sm text-muted">
+              <li>
+                <strong className="text-fg font-medium">Interação Alta (≥ 15%):</strong> Baseada nos templates clássicos da comunidade (como <em>The Command Zone</em> e <em>EpicEDH</em>), que recomendam 10 peças de interação (remoção, proteção, anulações) para rodar de forma eficiente. Em um deck padrão de 65 cartas não-terreno, 10 peças equivalem a cerca de 15%.
+              </li>
+              <li>
+                <strong className="text-fg font-medium">Mana Rápida Curada (≥ 2 peças):</strong> Presença de 2 ou mais aceleradores explosivos de uma lista curada (como Sol Ring, Mana Crypt, Mox Diamond, etc), indicando vantagem explosiva de curva nos primeiros turnos.
+              </li>
+              <li>
+                <strong className="text-fg font-medium">Tutor Amplo (≥ 1 peça):</strong> Presença de qualquer tutor irrestrito (que não limita a busca a um subtipo específico como Terreno ou Criatura), indicando consistência para buscar a resposta exata ou peça de combo na hora certa.
+              </li>
+            </ul>
+            <p className="mt-3 text-justify text-sm text-muted">
+              <strong className="text-fg mt-1 block">Métrica Informacional: Velocidade do deck</strong>
+              Calculamos um indicador de velocidade (Baixa / Média / Alta) somando pontos: <strong>(1)</strong> média de custo (MV) não-terreno ≤ 2.5; <strong>(2)</strong> ≥ 2 peças de mana rápida; <strong>(3)</strong> densidade de tutores ≥ 5%; <strong>(4)</strong> presença de pelo menos 1 combo. Velocidade alta (3-4 pts) ou média (1-2 pts) aparecem no relatório final apenas como contexto de metagame, mas <strong>não</strong> alteram o cálculo de bracket sozinhos.
             </p>
           </div>
 
